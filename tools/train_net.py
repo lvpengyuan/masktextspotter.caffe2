@@ -42,7 +42,7 @@ from core.config import cfg
 from core.config import get_output_dir
 from core.config import merge_cfg_from_file
 from core.config import merge_cfg_from_list
-from datasets.roidb import combined_roidb_for_training
+from datasets.roidb_text import combined_roidb_for_training
 from modeling import model_builder
 from utils.logging import log_json_stats
 from utils.logging import setup_logging
