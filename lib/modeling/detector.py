@@ -308,6 +308,10 @@ class DetectionModelHelper(cnn.CNNModelHelper):
           - Use of FPN or not
           - Specifics of the transform method
         """
+        print(resolution)
+        print(resolution_h)
+        print(resolution_w)
+        raw_input()
         assert method in {'RoIPoolF', 'RoIAlign'}, \
             'Unknown pooling method: {}'.format(method)
         has_argmax = (method == 'RoIPoolF')

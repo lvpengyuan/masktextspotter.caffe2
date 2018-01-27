@@ -13,3 +13,4 @@ tests/*.jpg
 lib/datasets/cache
 lib/datasets/data
 tests/vis*
+train/
