@@ -89,6 +89,8 @@ def add_mask_rcnn_outputs(model, blob_in, dim):
             cfg.MRCNN.UPSAMPLE_RATIO
         )
     blob_out_char_trans = model.net.Transpose(blob_out_char, 'blob_out_char_trans', axes=[0,2,3,1])
+    print(blob_out_char_trans)
+    raw_input()
     blob_out_char_reshape, _ = model.net.Reshape(blob_out_char_trans, ['blob_out_char_reshape', 'blob_out_char_old_shape'], shape=(-1, num_cls))
     if not model.train:  # == if test
         blob_out_global = model.net.Sigmoid(blob_out_global, 'mask_fcn_global_probs')
