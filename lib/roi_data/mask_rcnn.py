@@ -234,8 +234,8 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
     # Update blobs dict with Mask R-CNN blobs
     blobs['mask_rois'] = rois_fg
     blobs['roi_has_mask_int32'] = roi_has_mask
-    blobs['masks_global_int32'] = masks[i, 0, :]
-    blobs['masks_char_int32'] = masks[i, 1, :]
+    blobs['masks_global_int32'] = masks[:, 0, :]
+    blobs['masks_char_int32'] = masks[:, 1, :]
 
 
 
