@@ -50,6 +50,20 @@ _RENAME = {
     # Removed "ResNet_" from the name because it wasn't relevent
     'mask_rcnn_heads.ResNet_mask_rcnn_fcn_head_v0up':
         'mask_rcnn_heads.mask_rcnn_fcn_head_v0up',
+
+    # Removed "ResNet_" from the name because it wasn't relevent
+    'text_mask_rcnn_heads.ResNet_mask_rcnn_fcn_head_v1up4convs':
+        'text_mask_rcnn_heads.mask_rcnn_fcn_head_v1up4convs',
+    # Removed "ResNet_" from the name because it wasn't relevent
+    'text_mask_rcnn_heads.ResNet_mask_rcnn_fcn_head_v1up':
+        'text_mask_rcnn_heads.mask_rcnn_fcn_head_v1up',
+    # Removed "ResNet_" from the name because it wasn't relevent
+    'text_mask_rcnn_heads.ResNet_mask_rcnn_fcn_head_v0upshare':
+        'text_mask_rcnn_heads.mask_rcnn_fcn_head_v0upshare',
+    # Removed "ResNet_" from the name because it wasn't relevent
+    'text_mask_rcnn_heads.ResNet_mask_rcnn_fcn_head_v0up':
+        'text_mask_rcnn_heads.mask_rcnn_fcn_head_v0up',
+
     # Removed head_builder module in favor of the more specific fast_rcnn name
     'head_builder.add_roi_2mlp_head':
         'fast_rcnn_heads.add_roi_2mlp_head',
