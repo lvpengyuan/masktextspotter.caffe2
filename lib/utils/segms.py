@@ -30,6 +30,7 @@ from __future__ import unicode_literals
 import numpy as np
 
 import pycocotools.mask as mask_util
+import cv2
 
 
 def flip_segms(segms, height, width):
@@ -115,6 +116,50 @@ def polys_to_mask_wrt_box(polygons, box, M):
     mask = np.sum(mask, axis=2)
     mask = np.array(mask > 0, dtype=np.float32)
     return mask
+
+def polys_to_mask_wrt_box_rec(rec_rois_gt_chars, polygon, box, M_HEIGHT, M_WIDTH, shrink = 0.25):
+    """Convert from the COCO polygon segmentation format to a binary mask
+    encoded as a 2D array of data type numpy.float32. The polygon segmentation
+    is understood to be enclosed in the given box and rasterized to an M x M
+    mask. The resulting mask is therefore of shape (M, M).
+    """
+    char_map = np.zeros((2, M_HEIGHT, M_WIDTH), dtype=np.float32)
+    # char_map_weight = np.zeros((2, M_HEIGHT, M_WIDTH), dtype=np.float32)
+
+    xmin = box[0]
+    ymin = box[1]
+    w = box[2] - box[0]
+    h = box[3] - box[1]
+
+    w = np.maximum(w, 1)
+    h = np.maximum(h, 1)
+
+    polygon_norm = np.array(polygon[0], dtype=np.float32)
+    polygon_norm[0:8:2] = (polygon_norm[0:8:2] - xmin) * M_WIDTH / w
+    polygon_norm[1:8:2] = (polygon_norm[1:8:2] - ymin) * M_HEIGHT / h
+    polygon_reshape = polygon_norm.reshape((4, 2)).astype(np.int32)
+    cv2.fillPoly(char_map[0,:,:], [polygon_reshape], 1)
+    # char_map_weight[0,:,:] = np.ones((M_HEIGHT, M_WIDTH))
+
+    if rec_rois_gt_chars.size > 0:
+        rec_rois_gt_chars[0,:,0:8:2] = (rec_rois_gt_chars[0,:,0:8:2] - xmin) * M_WIDTH / w
+        rec_rois_gt_chars[0,:,1:8:2] = (rec_rois_gt_chars[0,:,1:8:2] - ymin) * M_HEIGHT / h
+        for i in range(rec_rois_gt_chars.shape[1]):  
+            gt_poly = rec_rois_gt_chars[0,i,:8]
+            gt_poly_reshape = gt_poly.reshape((4, 2))
+            char_cls = int(rec_rois_gt_chars[0,i,8])
+            if shrink>0:
+                npoly = _shrink_poly(gt_poly_reshape, shrink)
+            else:
+                npoly = gt_poly_reshape
+            poly = npoly.astype(np.int32)
+            map_tmp = np.zeros((M_HEIGHT, M_WIDTH))
+            cv2.fillPoly(char_map[1,:,:], [poly], char_cls)
+            # char_map_weight[1,:,:] = np.ones((M_HEIGHT, M_WIDTH))
+    else:
+        char_map[1, :, :].fill(-1)
+
+    return char_map
 
 
 def polys_to_boxes(polys):
@@ -266,3 +311,66 @@ def rle_masks_to_boxes(masks):
         boxes[i, :] = (x0, y0, x1, y1)
 
     return boxes, np.where(keep)[0]
+
+def _shrink_poly(poly, shrink):
+    # shrink ratio
+    R = shrink
+    r = [None, None, None, None]
+    for i in range(4):
+        r[i] = min(np.linalg.norm(poly[i] - poly[(i + 1) % 4]),
+                   np.linalg.norm(poly[i] - poly[(i - 1) % 4]))
+    # find the longer pair
+    if np.linalg.norm(poly[0] - poly[1]) + np.linalg.norm(poly[2] - poly[3]) > \
+                    np.linalg.norm(poly[0] - poly[3]) + np.linalg.norm(poly[1] - poly[2]):
+        # first move (p0, p1), (p2, p3), then (p0, p3), (p1, p2)
+        ## p0, p1
+        theta = np.arctan2((poly[1][1] - poly[0][1]), (poly[1][0] - poly[0][0]))
+        poly[0][0] += R * r[0] * np.cos(theta)
+        poly[0][1] += R * r[0] * np.sin(theta)
+        poly[1][0] -= R * r[1] * np.cos(theta)
+        poly[1][1] -= R * r[1] * np.sin(theta)
+        ## p2, p3
+        theta = np.arctan2((poly[2][1] - poly[3][1]), (poly[2][0] - poly[3][0]))
+        poly[3][0] += R * r[3] * np.cos(theta)
+        poly[3][1] += R * r[3] * np.sin(theta)
+        poly[2][0] -= R * r[2] * np.cos(theta)
+        poly[2][1] -= R * r[2] * np.sin(theta)
+        ## p0, p3
+        theta = np.arctan2((poly[3][0] - poly[0][0]), (poly[3][1] - poly[0][1]))
+        poly[0][0] += R * r[0] * np.sin(theta)
+        poly[0][1] += R * r[0] * np.cos(theta)
+        poly[3][0] -= R * r[3] * np.sin(theta)
+        poly[3][1] -= R * r[3] * np.cos(theta)
+        ## p1, p2
+        theta = np.arctan2((poly[2][0] - poly[1][0]), (poly[2][1] - poly[1][1]))
+        poly[1][0] += R * r[1] * np.sin(theta)
+        poly[1][1] += R * r[1] * np.cos(theta)
+        poly[2][0] -= R * r[2] * np.sin(theta)
+        poly[2][1] -= R * r[2] * np.cos(theta)
+    else:
+        ## p0, p3
+        # print poly
+        theta = np.arctan2((poly[3][0] - poly[0][0]), (poly[3][1] - poly[0][1]))
+        poly[0][0] += R * r[0] * np.sin(theta)
+        poly[0][1] += R * r[0] * np.cos(theta)
+        poly[3][0] -= R * r[3] * np.sin(theta)
+        poly[3][1] -= R * r[3] * np.cos(theta)
+        ## p1, p2
+        theta = np.arctan2((poly[2][0] - poly[1][0]), (poly[2][1] - poly[1][1]))
+        poly[1][0] += R * r[1] * np.sin(theta)
+        poly[1][1] += R * r[1] * np.cos(theta)
+        poly[2][0] -= R * r[2] * np.sin(theta)
+        poly[2][1] -= R * r[2] * np.cos(theta)
+        ## p0, p1
+        theta = np.arctan2((poly[1][1] - poly[0][1]), (poly[1][0] - poly[0][0]))
+        poly[0][0] += R * r[0] * np.cos(theta)
+        poly[0][1] += R * r[0] * np.sin(theta)
+        poly[1][0] -= R * r[1] * np.cos(theta)
+        poly[1][1] -= R * r[1] * np.sin(theta)
+        ## p2, p3
+        theta = np.arctan2((poly[2][1] - poly[3][1]), (poly[2][0] - poly[3][0]))
+        poly[3][0] += R * r[3] * np.cos(theta)
+        poly[3][1] += R * r[3] * np.sin(theta)
+        poly[2][0] -= R * r[2] * np.cos(theta)
+        poly[2][1] -= R * r[2] * np.sin(theta)
+    return poly

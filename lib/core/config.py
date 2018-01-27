@@ -737,13 +737,15 @@ __C.MRCNN = AttrDict()
 __C.MRCNN.ROI_MASK_HEAD = b''
 
 # Resolution of mask predictions
-__C.MRCNN.RESOLUTION = 14
+__C.MRCNN.RESOLUTION_H = 14
+__C.MRCNN.RESOLUTION_W = 14
 
 # RoI transformation function and associated options
 __C.MRCNN.ROI_XFORM_METHOD = b'RoIAlign'
 
 # RoI transformation function (e.g., RoIPool or RoIAlign)
-__C.MRCNN.ROI_XFORM_RESOLUTION = 7
+__C.MRCNN.ROI_XFORM_RESOLUTION_H = 7
+__C.MRCNN.ROI_XFORM_RESOLUTION_W = 7
 
 # Number of grid sampling points in RoIAlign (usually use 2)
 # Only applies to RoIAlign
@@ -774,6 +776,7 @@ __C.MRCNN.WEIGHT_LOSS_MASK = 1.0
 # Binarization threshold for converting soft masks to hard masks
 __C.MRCNN.THRESH_BINARIZE = 0.5
 
+__C.MRCNN.IS_E2E = False
 
 # ---------------------------------------------------------------------------- #
 # Keyoint Mask R-CNN options ("KRCNN" = Mask R-CNN with Keypoint support)
