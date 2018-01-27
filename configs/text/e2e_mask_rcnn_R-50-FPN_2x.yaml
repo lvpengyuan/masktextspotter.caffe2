@@ -23,9 +23,13 @@ FAST_RCNN:
   ROI_XFORM_SAMPLING_RATIO: 2
 MRCNN:
   ROI_MASK_HEAD: mask_rcnn_heads.mask_rcnn_fcn_head_v1up4convs
-  RESOLUTION: 28  # (output mask resolution) default 14
+  # RESOLUTION: 28  # (output mask resolution) default 14
+  RESOLUTION_H: 32
+  RESOLUTION_W: 128
   ROI_XFORM_METHOD: RoIAlign
-  ROI_XFORM_RESOLUTION: 14  # default 7
+  # ROI_XFORM_RESOLUTION: 14  # default 7
+  ROI_XFORM_RESOLUTION_H: 16
+  ROI_XFORM_RESOLUTION_W: 64
   ROI_XFORM_SAMPLING_RATIO: 2  # default 0
   DILATION: 1  # default 2
   CONV_INIT: MSRAFill  # default GaussianFill

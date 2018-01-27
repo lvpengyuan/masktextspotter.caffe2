@@ -239,7 +239,9 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         method='RoIPoolF',
         resolution=7,
         spatial_scale=1. / 16.,
-        sampling_ratio=0
+        sampling_ratio=0, 
+        resolution_w=None,
+        resolution_h=None
     ):
         """Add the specified RoI pooling method. The sampling_ratio argument
         is supported for some, but not all, RoI transform methods.
@@ -266,8 +268,8 @@ class DetectionModelHelper(cnn.CNNModelHelper):
                 bl_argmax = ['_argmax_' + bl_out] if has_argmax else []
                 self.net.__getattr__(method)(
                     [bl_in, bl_rois], [bl_out] + bl_argmax,
-                    pooled_w=resolution,
-                    pooled_h=resolution,
+                    pooled_w=resolution if resolution_w==None else resolution_w,
+                    pooled_h=resolution if resolution_h==None else resolution_h,
                     spatial_scale=sc,
                     sampling_ratio=sampling_ratio
                 )
@@ -288,8 +290,8 @@ class DetectionModelHelper(cnn.CNNModelHelper):
             # sampling_ratio is ignored for RoIPoolF
             xform_out = self.net.__getattr__(method)(
                 [blobs_in, blob_rois], [blob_out] + bl_argmax,
-                pooled_w=resolution,
-                pooled_h=resolution,
+                pooled_w=resolution if resolution_w==None else resolution_w,
+                pooled_h=resolution if resolution_h==None else resolution_h,
                 spatial_scale=spatial_scale,
                 sampling_ratio=sampling_ratio
             )
