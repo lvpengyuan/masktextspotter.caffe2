@@ -181,7 +181,7 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
         if fg_inds.shape[0] > 0:
             # Class labels for the foreground rois
             mask_class_labels = np.ones((fg_inds.shape[0], ), dtype=np.int32)
-            masks = blob_utils.zeros((fg_inds.shape[0], 2, M_HEIGHT*M_WIDTH), int32=True)
+            masks = blob_utils.zeros((fg_inds.shape[0], M_HEIGHT*M_WIDTH), int32=True)
             # mask_weights = blob_utils.zeros((fg_inds.shape[0], 2, M_HEIGHT*M_WIDTH), int32=True)
 
             rois_fg = gt_boxes
@@ -235,7 +235,7 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
     blobs['mask_rois'] = rois_fg
     blobs['roi_has_mask_int32'] = roi_has_mask
     blobs['masks_global_int32'] = masks[:, 0, :]
-    blobs['masks_char_int32'] = masks[:, 1, :]
+    blobs['masks_char_int32'] = masks[:, 1, :].reshape((-1,))
 
 
 
