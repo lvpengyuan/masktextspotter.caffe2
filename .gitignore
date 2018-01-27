@@ -1,0 +1,15 @@
+# Python:
+*.pyc
+*.so
+*.egg
+*.egg-info
+dist
+build
+
+model/
+output/
+external/
+tests/*.jpg
+lib/datasets/cache
+lib/datasets/data
+tests/vis*

@@ -30,6 +30,8 @@ from caffe2.python import workspace
 from core.config import cfg
 from ops.collect_and_distribute_fpn_rpn_proposals \
     import CollectAndDistributeFpnRpnProposalsOp
+from ops.collect_and_distribute_fpn_rpn_proposals_rec \
+    import CollectAndDistributeFpnRpnProposalsRecOp
 from ops.generate_proposal_labels import GenerateProposalLabelsOp
 from ops.generate_proposals import GenerateProposalsOp
 from utils import lr_policy
@@ -217,6 +219,62 @@ class DetectionModelHelper(cnn.CNNModelHelper):
 
         outputs = self.net.Python(
             CollectAndDistributeFpnRpnProposalsOp(self.train).forward
+        )(blobs_in, blobs_out, name=name)
+
+        return outputs
+
+    def CollectAndDistributeFpnRpnProposalsRec(self):
+        """Merge RPN proposals generated at multiple FPN levels and then
+        distribute those proposals to their appropriate FPN levels. An anchor
+        at one FPN level may predict an RoI that will map to another level,
+        hence the need to redistribute the proposals.
+
+        This function assumes standard blob names for input and output blobs.
+
+        Input blobs: [rpn_rois_fpn<min>, ..., rpn_rois_fpn<max>,
+                      rpn_roi_probs_fpn<min>, ..., rpn_roi_probs_fpn<max>]
+          - rpn_rois_fpn<i> are the RPN proposals for FPN level i; see rpn_rois
+            documentation from GenerateProposals.
+          - rpn_roi_probs_fpn<i> are the RPN objectness probabilities for FPN
+            level i; see rpn_roi_probs documentation from GenerateProposals.
+
+        If used during training, then the input blobs will also include:
+          [roidb, im_info] (see GenerateProposalLabels).
+
+        Output blobs: [rois_fpn<min>, ..., rois_rpn<max>, rois,
+                       rois_idx_restore]
+          - rois_fpn<i> are the RPN proposals for FPN level i
+          - rois_idx_restore is a permutation on the concatenation of all
+            rois_fpn<i>, i=min...max, such that when applied the RPN RoIs are
+            restored to their original order in the input blobs.
+
+        If used during training, then the output blobs will also include:
+          [labels, bbox_targets, bbox_inside_weights, bbox_outside_weights].
+        """
+        k_max = cfg.FPN.RPN_MAX_LEVEL
+        k_min = cfg.FPN.RPN_MIN_LEVEL
+
+        # Prepare input blobs
+        rois_names = ['rpn_rois_fpn' + str(l) for l in range(k_min, k_max + 1)]
+        score_names = [
+            'rpn_roi_probs_fpn' + str(l) for l in range(k_min, k_max + 1)
+        ]
+        blobs_in = rois_names + score_names
+        if self.train:
+            blobs_in += ['roidb', 'im_info']
+        blobs_in = [core.ScopedBlobReference(b) for b in blobs_in]
+        name = 'CollectAndDistributeFpnRpnProposalsRecOp:' + ','.join(
+            [str(b) for b in blobs_in]
+        )
+
+        # Prepare output blobs
+        blobs_out = roi_data.fast_rcnn.get_fast_rcnn_blob_names(
+            is_training=self.train
+        )
+        blobs_out = [core.ScopedBlobReference(b) for b in blobs_out]
+
+        outputs = self.net.Python(
+            CollectAndDistributeFpnRpnProposalsRecOp(self.train).forward
         )(blobs_in, blobs_out, name=name)
 
         return outputs
