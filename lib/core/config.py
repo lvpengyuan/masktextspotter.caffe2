@@ -737,6 +737,7 @@ __C.MRCNN = AttrDict()
 __C.MRCNN.ROI_MASK_HEAD = b''
 
 # Resolution of mask predictions
+__C.MRCNN.RESOLUTION = 14
 __C.MRCNN.RESOLUTION_H = 14
 __C.MRCNN.RESOLUTION_W = 14
 
@@ -744,6 +745,7 @@ __C.MRCNN.RESOLUTION_W = 14
 __C.MRCNN.ROI_XFORM_METHOD = b'RoIAlign'
 
 # RoI transformation function (e.g., RoIPool or RoIAlign)
+__C.MRCNN.ROI_XFORM_RESOLUTION = 7
 __C.MRCNN.ROI_XFORM_RESOLUTION_H = 7
 __C.MRCNN.ROI_XFORM_RESOLUTION_W = 7
 

@@ -47,7 +47,8 @@ from modeling.detector import DetectionModelHelper
 from roi_data.loader import RoIDataLoader
 import modeling.fast_rcnn_heads as fast_rcnn_heads
 import modeling.keypoint_rcnn_heads as keypoint_rcnn_heads
-import modeling.mask_rcnn_heads as mask_rcnn_heads
+# import modeling.mask_rcnn_heads as mask_rcnn_heads
+import modeling.text_mask_rcnn_heads as mask_rcnn_heads
 import modeling.name_compat
 import modeling.optimizer as optim
 import modeling.retinanet_heads as retinanet_heads

@@ -223,10 +223,15 @@ def _sample_rois(roidb, im_scale, batch_idx):
     )
 
     # Optionally add Mask R-CNN blobs
+    # if cfg.MODEL.MASK_ON:
+    #     roi_data.mask_rcnn.add_mask_rcnn_blobs(
+    #         blob_dict, sampled_boxes, roidb, im_scale, batch_idx
+    #     )
     if cfg.MODEL.MASK_ON:
-        roi_data.mask_rcnn.add_mask_rcnn_blobs(
+        roi_data.mask_rcnn.add_charmask_rcnn_blobs(
             blob_dict, sampled_boxes, roidb, im_scale, batch_idx
         )
+
 
     # Optionally add Keypoint R-CNN blobs
     if cfg.MODEL.KEYPOINTS_ON:
