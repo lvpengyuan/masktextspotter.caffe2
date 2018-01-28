@@ -37,7 +37,7 @@ MRCNN:
 TRAIN:
   WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
   # DATASETS: ('icdar2013_train', 'icdar2015_train')
-  DATASETS: ('icdar2013_train', 'icdar2015_train')
+  DATASETS: ('icdar2013_train', )
   SCALES: (800,)
   MAX_SIZE: 1333
   BATCH_SIZE_PER_IM: 512

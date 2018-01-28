@@ -45,7 +45,7 @@ import utils.blob as blob_utils
 
 def add_mask_rcnn_outputs(model, blob_in, dim):
     """Add Mask R-CNN specific outputs: either mask logits or probs."""
-    num_cls = cfg.MODEL.NUM_CLASSES if cfg.MRCNN.CLS_SPECIFIC_MASK else 1
+    num_cls = 37
 
 
     # Predict mask using Conv
@@ -88,15 +88,13 @@ def add_mask_rcnn_outputs(model, blob_in, dim):
             'mask_fcn_char_logits', 'mask_fcn_char_logits_up', num_cls, num_cls,
             cfg.MRCNN.UPSAMPLE_RATIO
         )
-    blob_out_char_trans = model.net.Transpose(blob_out_char, 'blob_out_char_trans', axes=[0,2,3,1])
-    print(blob_out_char_trans)
-    raw_input()
-    blob_out_char_reshape, _ = model.net.Reshape(blob_out_char_trans, ['blob_out_char_reshape', 'blob_out_char_old_shape'], shape=(-1, num_cls))
+    # blob_out_char_trans = model.net.Transpose(blob_out_char, 'blob_out_char_trans', axes=[0,2,3,1])
+    # blob_out_char_reshape, _ = model.net.Reshape(blob_out_char_trans, ['blob_out_char_reshape', 'blob_out_char_old_shape'], shape=(-1, num_cls))
     if not model.train:  # == if test
         blob_out_global = model.net.Sigmoid(blob_out_global, 'mask_fcn_global_probs')
-        blob_out_char_reshape = model.net.Softmax(blob_out_char_reshape, 'mask_fcn_char_probs')
+        blob_out_char = model.net.SpatialSoftmax(blob_out_char, 'mask_fcn_char_probs')
 
-    return [blob_out_global, blob_out_char_reshape]
+    return [blob_out_global, blob_out_char]
 
 
 def add_mask_rcnn_losses(model, blob_mask):
@@ -106,7 +104,7 @@ def add_mask_rcnn_losses(model, blob_mask):
         'loss_global_mask',
         scale=1. / cfg.NUM_GPUS * cfg.MRCNN.WEIGHT_LOSS_MASK
     )
-    mask_cls_prob, loss_char_mask = model.net.SoftmaxWithLoss(
+    mask_cls_prob, loss_char_mask = model.net.SpatialSoftmaxWithLoss(
         [blob_mask[1], 'masks_char_int32'],
         ['mask_cls_prob', 'loss_char_mask'],
         scale=1. / cfg.NUM_GPUS * cfg.MRCNN.WEIGHT_LOSS_MASK
