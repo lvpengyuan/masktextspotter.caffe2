@@ -112,6 +112,7 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
     is_e2e = cfg.MRCNN.IS_E2E
     M_HEIGHT = cfg.MRCNN.RESOLUTION_H
     M_WIDTH = cfg.MRCNN.RESOLUTION_W
+    mask_rois_per_this_image = cfg.MRCNN.MASK_BATCH_SIZE_PER_IM
     polys_gt_inds = np.where(
         (roidb['gt_classes'] > 0) & (roidb['is_crowd'] == 0)
     )[0]
@@ -124,8 +125,13 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
 
     if is_e2e:
         fg_inds = np.where(blobs['labels_int32'] > 0)[0]
-        roi_has_mask = blobs['labels_int32'].copy()
-        roi_has_mask[roi_has_mask > 0] = 1
+        if fg_inds.size > 0:
+            fg_inds = npr.choice(
+                fg_inds, size=mask_rois_per_this_image, replace=False
+            )
+        roi_has_mask = np.ones((fg_inds.shape[0], ), dtype=np.int32)
+        # roi_has_mask = blobs['labels_int32'].copy()
+        # roi_has_mask[roi_has_mask > 0] = 1
 
         if fg_inds.shape[0] > 0:
             # Class labels for the foreground rois

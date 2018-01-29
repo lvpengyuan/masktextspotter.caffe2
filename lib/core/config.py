@@ -109,7 +109,7 @@ __C.TRAIN.BG_THRESH_HI = 0.5
 __C.TRAIN.BG_THRESH_LO = 0.0
 
 # Use horizontally-flipped images during training?
-__C.TRAIN.USE_FLIPPED = True
+__C.TRAIN.USE_FLIPPED = False
 
 # Overlap required between an RoI and a ground-truth box in order for that
 # (RoI, gt box) pair to be used as a bounding-box regression training example
@@ -779,6 +779,8 @@ __C.MRCNN.WEIGHT_LOSS_MASK = 1.0
 __C.MRCNN.THRESH_BINARIZE = 0.5
 
 __C.MRCNN.IS_E2E = False
+
+__C.MRCNN.MASK_BATCH_SIZE_PER_IM = 64
 
 # ---------------------------------------------------------------------------- #
 # Keyoint Mask R-CNN options ("KRCNN" = Mask R-CNN with Keypoint support)
