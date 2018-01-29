@@ -69,8 +69,16 @@ def plot_log(x, y, save_name, key):
 	plt.title(key)
 	plt.xlabel("iter")
 	plt.ylabel(key)
+	if key in ["loss"]:
+		plt.axis([0, len(x)*20 + 1000, 0, 2.5])
+	if key in ["loss_rpn_bbox_fpn2", "loss_rpn_bbox_fpn3", "loss_rpn_bbox_fpn4", "loss_rpn_bbox_fpn5", "loss_rpn_bbox_fpn6"]:
+		plt.axis([0, len(x)*20 + 1000, 0, 0.01])
+	if key in ["loss_rpn_cls_fpn2", "loss_rpn_cls_fpn3", "loss_rpn_cls_fpn4", "loss_rpn_cls_fpn5", "loss_rpn_cls_fpn6"]:
+		plt.axis([0, len(x)*20 + 1000, 0, 0.02])
 	if key in ["loss_global_mask", "loss_char_mask"]:
 		plt.axis([0, len(x)*20 + 1000, 0, 0.4])
+	if key in ["accuracy_cls"]:
+		plt.axis([0, len(x)*20 + 1000, 0.9, 1])
 	plt.plot(x, y, 'r-', lw=2)
 	plt.plot(x, smooth(y, 20), 'g-', lw=2)
 	# plt.plot(x, savgol_filter(y, 51, 3), 'g-', lw=2)
