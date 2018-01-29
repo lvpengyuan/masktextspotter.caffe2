@@ -45,7 +45,7 @@ from core.config import merge_cfg_from_list
 from datasets.roidb_text import combined_roidb_for_training
 from modeling import model_builder
 from utils.logging import log_json_stats
-from utils.logging import setup_logging
+from utils.logging import setup_logging, setup_logger
 from utils.logging import SmoothedValue
 from utils.timer import Timer
 import utils.c2
@@ -203,6 +203,7 @@ def train_model():
     """Model training loop."""
     logger = logging.getLogger(__name__)
     model, start_iter, checkpoints, output_dir = create_model()
+    setup_logger(output_dir)
     if 'final' in checkpoints:
         # The final model was found in the output directory, so nothing to do
         return checkpoints

@@ -8,7 +8,8 @@ NUM_GPUS: 4
 SOLVER:
   WEIGHT_DECAY: 0.0001
   LR_POLICY: steps_with_decay
-  BASE_LR: 0.01
+  # BASE_LR: 0.01  icdar13 
+  BASE_LR: 0.005   #synth
   GAMMA: 0.1
   MAX_ITER: 200000
   STEPS: [0, 120000, 160000]
@@ -33,11 +34,13 @@ MRCNN:
   ROI_XFORM_SAMPLING_RATIO: 2  # default 0
   DILATION: 1  # default 2
   CONV_INIT: MSRAFill  # default GaussianFill
-  IS_E2E: False
-  MASK_BATCH_SIZE_PER_IM: 64
+  IS_E2E: True
+  MASK_BATCH_SIZE_PER_IM: 16
+  WEIGHT_LOSS_MASK: 1.0
 TRAIN:
   WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
   # DATASETS: ('icdar2013_train', 'icdar2015_train')
+  # DATASETS: ('icdar2013_train', )
   DATASETS: ('synth_train', )
   SCALES: (800,)
   MAX_SIZE: 1333

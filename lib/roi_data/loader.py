@@ -149,6 +149,8 @@ class RoIDataLoader(object):
                     np.random.permutation(vert_inds)
                 )
             )
+            if inds.size % 2 ==1:
+                inds = np.hstack((inds.copy(), np.array([inds[-1]]).reshape((1, ))))
             inds = np.reshape(inds, (-1, 2))
             row_perm = np.random.permutation(np.arange(inds.shape[0]))
             inds = np.reshape(inds[row_perm, :], (-1, ))

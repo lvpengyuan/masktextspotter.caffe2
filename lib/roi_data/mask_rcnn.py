@@ -25,7 +25,7 @@ from __future__ import unicode_literals
 
 import logging
 import numpy as np
-
+import numpy.random as npr
 from core.config import cfg
 import utils.blob as blob_utils
 import utils.boxes as box_utils
@@ -125,7 +125,7 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
 
     if is_e2e:
         fg_inds = np.where(blobs['labels_int32'] > 0)[0]
-        if fg_inds.size > 0:
+        if fg_inds.size > mask_rois_per_this_image:
             fg_inds = npr.choice(
                 fg_inds, size=mask_rois_per_this_image, replace=False
             )
