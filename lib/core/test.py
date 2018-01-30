@@ -78,9 +78,6 @@ def im_detect_all(model, im, im_index, box_proposals, timers=None, vis=True):
             global_masks, char_masks = im_detect_mask(model, im_scales, boxes)
         timers['im_detect_mask'].toc()
         scale = im_scales[0]
-        # print(char_masks.shape)
-        # print(char_masks[0,0,:,:].max(), char_masks[0,0,:,:].min())
-        # raw_input()
         if vis:
             img_char = np.zeros((im.shape[0], im.shape[1]))
             img_poly = np.zeros((im.shape[0], im.shape[1]))
@@ -433,14 +430,16 @@ def im_detect_mask(model, im_scales, boxes):
     ).squeeze()
     pred_char_masks = workspace.FetchBlob(
         core.ScopedName('mask_fcn_char_probs')
+        # core.ScopedName('mask_fcn_char_logits')
     ).squeeze()
-
     # if cfg.MRCNN.CLS_SPECIFIC_MASK:
     #     pred_masks = pred_masks.reshape([-1, cfg.MODEL.NUM_CLASSES, M_HEIGHT, M_WIDTH])
     # else:
     #     pred_masks = pred_masks.reshape([-1, 1, M_HEIGHT, M_WIDTH])
     pred_global_masks = pred_global_masks.reshape([-1, 1, M_HEIGHT, M_WIDTH])
-    pred_char_masks = pred_char_masks.reshape([-1, 37, M_HEIGHT, M_WIDTH])
+    pred_char_masks = pred_char_masks.reshape([-1, M_HEIGHT, M_WIDTH, 37])
+    pred_char_masks = pred_char_masks.transpose([0,3,1,2])
+
 
     return pred_global_masks, pred_char_masks
 
