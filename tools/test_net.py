@@ -95,7 +95,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def main(ind_range=None, multi_gpu_testing=False):
+def main(ind_range=None, multi_gpu_testing=False, vis=False):
     # Determine which parent or child function should handle inference
     if cfg.MODEL.RPN_ONLY:
         child_func = generate_rpn_on_range
@@ -120,21 +120,12 @@ def main(ind_range=None, multi_gpu_testing=False):
             cfg.TEST.DATASETS = (cfg.TEST.DATASET, )
             cfg.TEST.PROPOSAL_FILES = (cfg.TEST.PROPOSAL_FILE, )
 
-        # all_results = {}
         for i in range(len(cfg.TEST.DATASETS)):
             cfg.TEST.DATASET = cfg.TEST.DATASETS[i]
             if cfg.TEST.PRECOMPUTED_PROPOSALS:
                 cfg.TEST.PROPOSAL_FILE = cfg.TEST.PROPOSAL_FILES[i]
-            parent_func(multi_gpu=multi_gpu_testing)
-            # results = parent_func(multi_gpu=multi_gpu_testing)
-            # all_results.update(results)
+            parent_func(multi_gpu=multi_gpu_testing, vis=vis)
 
-        # task_evaluation.check_expected_results(
-        #     all_results,
-        #     atol=cfg.EXPECTED_RESULTS_ATOL,
-        #     rtol=cfg.EXPECTED_RESULTS_RTOL
-        # )
-        # task_evaluation.log_copy_paste_friendly_results(all_results)
     else:
         # Subprocess child case:
         # In this case test_net was called via subprocess.Popen to execute on a
@@ -162,4 +153,5 @@ if __name__ == '__main__':
         time.sleep(10)
 
     args.multi_gpu_testing = False
-    main(ind_range=args.range, multi_gpu_testing=args.multi_gpu_testing)
+    vis = cfg.TEST.VIS
+    main(ind_range=args.range, multi_gpu_testing=args.multi_gpu_testing, vis=vis)

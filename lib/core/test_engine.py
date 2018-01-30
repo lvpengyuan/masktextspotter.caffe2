@@ -47,7 +47,7 @@ import utils.vis as vis_utils
 logger = logging.getLogger(__name__)
 
 
-def test_net_on_dataset(multi_gpu=False):
+def test_net_on_dataset(multi_gpu=False, vis=False):
     """Run inference on a dataset."""
     output_dir = get_output_dir(training=False)
     dataset = TextDataSet(cfg.TEST.DATASET)
@@ -59,13 +59,10 @@ def test_net_on_dataset(multi_gpu=False):
     #         num_images, output_dir
     #     )
     # else:
-    all_boxes, all_polygons, all_strs, all_keyps = test_net()
+    test_net(vis=vis)
     test_timer.toc()
     logger.info('Total inference time: {:.3f}s'.format(test_timer.average_time))
-    # results = task_evaluation.evaluate_all(
-    #     dataset, all_boxes, all_global_segms, all_char_segms, all_keyps, output_dir
-    # )
-    # return results
+
 
 
 def multi_gpu_test_net_on_dataset(num_images, output_dir):
@@ -109,7 +106,7 @@ def multi_gpu_test_net_on_dataset(num_images, output_dir):
     return all_boxes, all_segms, all_keyps
 
 
-def test_net(ind_range=None):
+def test_net(ind_range=None, vis=False):
     """Run inference on all images in a dataset or over an index range of images
     in a dataset using a single GPU.
     """
@@ -145,78 +142,11 @@ def test_net(ind_range=None):
                 continue
 
         im = cv2.imread(entry['image'])
+        image_name = entry['image'].split('/')[-1].split('.')[0]
         with c2_utils.NamedCudaScope(0):
             im_detect_all(
-                model, im, i, box_proposals, timers, vis=True
+                model, im, image_name, box_proposals, timers, vis=vis
             )
-            # cls_boxes_i, global_cls_segms_i, char_cls_segms_i = im_detect_all(
-            #     model, im, box_proposals, timers
-            # )
-
-        # extend_results(i, all_boxes, cls_boxes_i)
-    #     if global_cls_segms_i is not None:
-    #         polygons_i = segms2polygons(global_cls_segms_i)
-    #         extend_results(i, all_polygons, polygons_i)
-
-    #     if char_cls_segms_i is not None:
-    #         strs_i = segms2polygons(global_cls_segms_i)
-    #         extend_results(i, all_strs, strs_i)
-
-    #     if i % 10 == 0:  # Reduce log file size
-    #         ave_total_time = np.sum([t.average_time for t in timers.values()])
-    #         eta_seconds = ave_total_time * (num_images - i - 1)
-    #         eta = str(datetime.timedelta(seconds=int(eta_seconds)))
-    #         det_time = (
-    #             timers['im_detect_bbox'].average_time +
-    #             timers['im_detect_mask'].average_time +
-    #             timers['im_detect_keypoints'].average_time
-    #         )
-    #         misc_time = (
-    #             timers['misc_bbox'].average_time +
-    #             timers['misc_mask'].average_time +
-    #             timers['misc_keypoints'].average_time
-    #         )
-    #         logger.info(
-    #             (
-    #                 'im_detect: range [{:d}, {:d}] of {:d}: '
-    #                 '{:d}/{:d} {:.3f}s + {:.3f}s (eta: {})'
-    #             ).format(
-    #                 start_ind + 1, end_ind, total_num_images, start_ind + i + 1,
-    #                 start_ind + num_images, det_time, misc_time, eta
-    #             )
-    #         )
-
-    #     if cfg.VIS:
-    #         im_name = os.path.splitext(os.path.basename(entry['image']))[0]
-    #         vis_utils.vis_one_image(
-    #             im[:, :, ::-1],
-    #             '{:d}_{:s}'.format(i, im_name),
-    #             os.path.join(output_dir, 'vis'),
-    #             cls_boxes_i,
-    #             segms=global_cls_segms_i,
-    #             thresh=cfg.VIS_TH,
-    #             box_alpha=0.8,
-    #             dataset=dataset,
-    #             show_class=True
-    #         )
-
-    # cfg_yaml = yaml.dump(cfg)
-    # if ind_range is not None:
-    #     det_name = 'detection_range_%s_%s.pkl' % tuple(ind_range)
-    # else:
-    #     det_name = 'detections.pkl'
-    # det_file = os.path.join(output_dir, det_name)
-    # save_object(
-    #     dict(
-    #         all_boxes=all_boxes,
-    #         all_polygons=all_polygons,
-    #         all_strs=all_strs,
-    #         all_keyps=all_keyps,
-    #         cfg=cfg_yaml
-    #     ), det_file
-    # )
-    # logger.info('Wrote detections to: {}'.format(os.path.abspath(det_file)))
-    return all_boxes, all_polygons, all_strs, all_keyps
 
 
 def initialize_model_from_cfg():

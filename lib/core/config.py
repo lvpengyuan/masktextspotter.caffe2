@@ -432,6 +432,8 @@ __C.TEST.BBOX_VOTE.SCORING_METHOD = b'ID'
 # different methods)
 __C.TEST.BBOX_VOTE.SCORING_METHOD_BETA = 1.0
 
+__C.TEST.VIS = False
+
 
 # ---------------------------------------------------------------------------- #
 # Model options

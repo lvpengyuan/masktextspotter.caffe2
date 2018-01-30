@@ -51,7 +51,7 @@ import os
 logger = logging.getLogger(__name__)
 
 
-def im_detect_all(model, im, im_index, box_proposals, timers=None, vis=True):
+def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
     if timers is None:
         timers = defaultdict(Timer)
 
@@ -78,6 +78,7 @@ def im_detect_all(model, im, im_index, box_proposals, timers=None, vis=True):
             global_masks, char_masks = im_detect_mask(model, im_scales, boxes)
         timers['im_detect_mask'].toc()
         scale = im_scales[0]
+        result_logs = []
         if vis:
             img_char = np.zeros((im.shape[0], im.shape[1]))
             img_poly = np.zeros((im.shape[0], im.shape[1]))
@@ -112,7 +113,8 @@ def im_detect_all(model, im, im_index, box_proposals, timers=None, vis=True):
             pts_origin = [x * 1.0 / scale for x in pts]
             pts_origin = map(int, pts_origin)
             text, rec_score = getstr(char_masks[index,:,:,:].copy(), box_w, box_h)
-            result_log = ([int(x * 1.0 / scale) for x in box[:4]] + pts_origin + [text] + [scores[index]] + [rec_score])
+            result_log = [int(x * 1.0 / scale) for x in box[:4]] + pts_origin + [text] + [scores[index]] + [rec_score]
+            result_logs.append(result_log)
             if vis:    
                 img_draw.rectangle(box, outline=(255, 0, 0))
                 img_draw.polygon(pts, outline=(255, 225, 0))
@@ -125,13 +127,32 @@ def im_detect_all(model, im, im_index, box_proposals, timers=None, vis=True):
                 img_poly[box[1]:box[3], box[0]:box[2]] = poly
                 img_char[box[1]:box[3], box[0]:box[2]] = char
 
+        model_path = cfg.TEST.WEIGHTS
+        model_name = model_path.split('/')[-1]
+        model_dir = model_path[0:len(model_path)-len(model_name)]
+        save_dir_res = os.path.join(model_dir, model_name+'_results')
+        
+        if not os.path.isdir(save_dir_res):
+            os.mkdir(save_dir_res)
+        
         if vis:
-            out_dir_img = './tests/visu/'
+            save_dir_visu = os.path.join(model_dir, model_name+'_visu')
+            if not os.path.isdir(save_dir_visu):
+                os.mkdir(save_dir_visu)
             img_poly = Image.fromarray(img_poly).convert('RGB')
             img_char = Image.fromarray(img_char).convert('RGB')
-            Image.blend(img, img_poly, 0.5).save(os.path.join(out_dir_img, str(im_index) + '_blend_poly.jpg'))
-            Image.blend(img, img_char, 0.5).save(os.path.join(out_dir_img, str(im_index) + '_blend_char.jpg'))
+            Image.blend(img, img_poly, 0.5).save(os.path.join(save_dir_visu, str(image_name) + '_blend_poly.jpg'))
+            Image.blend(img, img_char, 0.5).save(os.path.join(save_dir_visu, str(image_name) + '_blend_char.jpg'))
 
+        format_output(save_dir_res, result_logs, image_name)
+
+
+def format_output(out_dir, boxes, img_name):
+    res = open(os.path.join(out_dir, 'res_' + img_name.split('.')[0] + '.txt'), 'w')
+    for box in boxes:
+        box = ','.join([str(x) for x in box])
+        res.write(box + '\n')
+    res.close()
 
 def im_conv_body_only(model, im):
     """Runs `model.conv_body_net` on the given image `im`."""
