@@ -81,7 +81,9 @@ def im_detect_all(model, im, im_index, box_proposals, timers=None, vis=True):
         if vis:
             img_char = np.zeros((im.shape[0], im.shape[1]))
             img_poly = np.zeros((im.shape[0], im.shape[1]))
-            img_draw = ImageDraw.Draw(Image.fromarray(im))
+            im = cv2.cvtColor(im,cv2.COLOR_BGR2RGB)
+            img = Image.fromarray(im).convert('RGB')
+            img_draw = ImageDraw.Draw(img)
         for index in range(global_masks.shape[0]):
             box = boxes[index]
             box = map(int, box)
@@ -111,11 +113,10 @@ def im_detect_all(model, im, im_index, box_proposals, timers=None, vis=True):
             pts_origin = map(int, pts_origin)
             text, rec_score = getstr(char_masks[index,:,:,:].copy(), box_w, box_h)
             result_log = ([int(x * 1.0 / scale) for x in box[:4]] + pts_origin + [text] + [scores[index]] + [rec_score])
-            # print(result_log)
-            # raw_input()
             if vis:    
                 img_draw.rectangle(box, outline=(255, 0, 0))
-                img_draw.polygon(pts, outline=(255, 225, 0), fill=(225,225,0,20))
+                img_draw.polygon(pts, outline=(255, 225, 0))
+                # img_draw.polygon(pts, outline=(255, 225, 0), fill=(225,225,0,20))
                 fnt = ImageFont.truetype('./fonts/kaiti.ttf', 20)
                 img_draw.text((box[0], box[1]), text + ';' + str(scores[index])+ ';' + str(rec_score)[:4], font=fnt, fill = (0,0,225,255))
                 poly = np.array(Image.fromarray(cls_polys).resize((box_w, box_h))) 
@@ -127,13 +128,10 @@ def im_detect_all(model, im, im_index, box_proposals, timers=None, vis=True):
         if vis:
             out_dir_img = './tests/visu/'
             img_poly = Image.fromarray(img_poly).convert('RGB')
-            # img_poly.save(os.path.join(out_dir_img, imdb.image_set_index[img_index] + '_poly.jpg'))
             img_char = Image.fromarray(img_char).convert('RGB')
-            # img_char.save(os.path.join(out_dir_img, imdb.image_set_index[img_index] + '_poly.jpg'))
-            Image.blend(Image.fromarray(im), img_poly, 0.5).save(os.path.join(out_dir_img, str(im_index) + '_blend_poly.jpg'))
-            Image.blend(Image.fromarray(im), img_char, 0.5).save(os.path.join(out_dir_img, str(im_index) + '_blend_char.jpg'))
-            # print('visu')
-            # raw_input()
+            Image.blend(img, img_poly, 0.5).save(os.path.join(out_dir_img, str(im_index) + '_blend_poly.jpg'))
+            Image.blend(img, img_char, 0.5).save(os.path.join(out_dir_img, str(im_index) + '_blend_char.jpg'))
+
 
 def im_conv_body_only(model, im):
     """Runs `model.conv_body_net` on the given image `im`."""

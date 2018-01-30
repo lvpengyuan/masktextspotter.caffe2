@@ -120,20 +120,21 @@ def main(ind_range=None, multi_gpu_testing=False):
             cfg.TEST.DATASETS = (cfg.TEST.DATASET, )
             cfg.TEST.PROPOSAL_FILES = (cfg.TEST.PROPOSAL_FILE, )
 
-        all_results = {}
+        # all_results = {}
         for i in range(len(cfg.TEST.DATASETS)):
             cfg.TEST.DATASET = cfg.TEST.DATASETS[i]
             if cfg.TEST.PRECOMPUTED_PROPOSALS:
                 cfg.TEST.PROPOSAL_FILE = cfg.TEST.PROPOSAL_FILES[i]
-            results = parent_func(multi_gpu=multi_gpu_testing)
-            all_results.update(results)
+            parent_func(multi_gpu=multi_gpu_testing)
+            # results = parent_func(multi_gpu=multi_gpu_testing)
+            # all_results.update(results)
 
-        task_evaluation.check_expected_results(
-            all_results,
-            atol=cfg.EXPECTED_RESULTS_ATOL,
-            rtol=cfg.EXPECTED_RESULTS_RTOL
-        )
-        task_evaluation.log_copy_paste_friendly_results(all_results)
+        # task_evaluation.check_expected_results(
+        #     all_results,
+        #     atol=cfg.EXPECTED_RESULTS_ATOL,
+        #     rtol=cfg.EXPECTED_RESULTS_RTOL
+        # )
+        # task_evaluation.log_copy_paste_friendly_results(all_results)
     else:
         # Subprocess child case:
         # In this case test_net was called via subprocess.Popen to execute on a

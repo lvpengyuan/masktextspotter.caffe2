@@ -88,11 +88,11 @@ def add_mask_rcnn_outputs(model, blob_in, dim):
             'mask_fcn_char_logits', 'mask_fcn_char_logits_up', num_cls, num_cls,
             cfg.MRCNN.UPSAMPLE_RATIO
         )
-    blob_out_char = model.net.Transpose(blob_out_char, 'blob_out_char_trans', axes=[0,2,3,1])
-    blob_out_char, _ = model.net.Reshape(blob_out_char, ['blob_out_char_reshape', 'blob_out_char_old_shape'], shape=(-1, 37))
+    
     if not model.train:  # == if test
         blob_out_global = model.net.Sigmoid(blob_out_global, 'mask_fcn_global_probs')
-        # blob_out_char = model.net.SpatialSoftmax(blob_out_char, 'mask_fcn_char_probs')
+        blob_out_char = model.net.Transpose(blob_out_char, 'blob_out_char_trans', axes=[0,2,3,1])
+        blob_out_char, _ = model.net.Reshape(blob_out_char, ['blob_out_char_reshape', 'blob_out_char_old_shape'], shape=(-1, 37))
         blob_out_char = model.net.Softmax(blob_out_char, 'mask_fcn_char_probs', axis=1)
 
 
