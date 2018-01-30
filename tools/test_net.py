@@ -160,4 +160,5 @@ if __name__ == '__main__':
         logger.info('Waiting for \'{}\' to exist...'.format(cfg.TEST.WEIGHTS))
         time.sleep(10)
 
+    args.multi_gpu_testing = False
     main(ind_range=args.range, multi_gpu_testing=args.multi_gpu_testing)

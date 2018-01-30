@@ -34,7 +34,7 @@ from core.config import cfg
 from core.config import get_output_dir
 from core.test import im_detect_all
 from datasets import task_evaluation
-from datasets.json_dataset import JsonDataset
+from datasets.text_dataset import TextDataSet
 from modeling import model_builder
 from utils.io import save_object
 from utils.timer import Timer
@@ -50,22 +50,22 @@ logger = logging.getLogger(__name__)
 def test_net_on_dataset(multi_gpu=False):
     """Run inference on a dataset."""
     output_dir = get_output_dir(training=False)
-    dataset = JsonDataset(cfg.TEST.DATASET)
+    dataset = TextDataSet(cfg.TEST.DATASET)
     test_timer = Timer()
     test_timer.tic()
-    if multi_gpu:
-        num_images = len(dataset.get_roidb())
-        all_boxes, all_segms, all_keyps = multi_gpu_test_net_on_dataset(
-            num_images, output_dir
-        )
-    else:
-        all_boxes, all_segms, all_keyps = test_net()
+    # if multi_gpu:
+    #     num_images = len(dataset.get_roidb())
+    #     all_boxes, all_global_segms, all_char_segms, all_keyps = multi_gpu_test_net_on_dataset(
+    #         num_images, output_dir
+    #     )
+    # else:
+    all_boxes, all_polygons, all_strs, all_keyps = test_net()
     test_timer.toc()
     logger.info('Total inference time: {:.3f}s'.format(test_timer.average_time))
-    results = task_evaluation.evaluate_all(
-        dataset, all_boxes, all_segms, all_keyps, output_dir
-    )
-    return results
+    # results = task_evaluation.evaluate_all(
+    #     dataset, all_boxes, all_global_segms, all_char_segms, all_keyps, output_dir
+    # )
+    # return results
 
 
 def multi_gpu_test_net_on_dataset(num_images, output_dir):
@@ -127,7 +127,7 @@ def test_net(ind_range=None):
     model = initialize_model_from_cfg()
     num_images = len(roidb)
     num_classes = cfg.MODEL.NUM_CLASSES
-    all_boxes, all_segms, all_keyps = empty_results(num_classes, num_images)
+    all_boxes, all_keyps, all_polygons, all_strs = empty_results(num_classes, num_images)
     timers = defaultdict(Timer)
     for i, entry in enumerate(roidb):
         if cfg.MODEL.FASTER_RCNN:
@@ -146,71 +146,77 @@ def test_net(ind_range=None):
 
         im = cv2.imread(entry['image'])
         with c2_utils.NamedCudaScope(0):
-            cls_boxes_i, cls_segms_i, cls_keyps_i = im_detect_all(
-                model, im, box_proposals, timers
+            im_detect_all(
+                model, im, i, box_proposals, timers, vis=True
             )
+            # cls_boxes_i, global_cls_segms_i, char_cls_segms_i = im_detect_all(
+            #     model, im, box_proposals, timers
+            # )
 
-        extend_results(i, all_boxes, cls_boxes_i)
-        if cls_segms_i is not None:
-            extend_results(i, all_segms, cls_segms_i)
-        if cls_keyps_i is not None:
-            extend_results(i, all_keyps, cls_keyps_i)
+        # extend_results(i, all_boxes, cls_boxes_i)
+    #     if global_cls_segms_i is not None:
+    #         polygons_i = segms2polygons(global_cls_segms_i)
+    #         extend_results(i, all_polygons, polygons_i)
 
-        if i % 10 == 0:  # Reduce log file size
-            ave_total_time = np.sum([t.average_time for t in timers.values()])
-            eta_seconds = ave_total_time * (num_images - i - 1)
-            eta = str(datetime.timedelta(seconds=int(eta_seconds)))
-            det_time = (
-                timers['im_detect_bbox'].average_time +
-                timers['im_detect_mask'].average_time +
-                timers['im_detect_keypoints'].average_time
-            )
-            misc_time = (
-                timers['misc_bbox'].average_time +
-                timers['misc_mask'].average_time +
-                timers['misc_keypoints'].average_time
-            )
-            logger.info(
-                (
-                    'im_detect: range [{:d}, {:d}] of {:d}: '
-                    '{:d}/{:d} {:.3f}s + {:.3f}s (eta: {})'
-                ).format(
-                    start_ind + 1, end_ind, total_num_images, start_ind + i + 1,
-                    start_ind + num_images, det_time, misc_time, eta
-                )
-            )
+    #     if char_cls_segms_i is not None:
+    #         strs_i = segms2polygons(global_cls_segms_i)
+    #         extend_results(i, all_strs, strs_i)
 
-        if cfg.VIS:
-            im_name = os.path.splitext(os.path.basename(entry['image']))[0]
-            vis_utils.vis_one_image(
-                im[:, :, ::-1],
-                '{:d}_{:s}'.format(i, im_name),
-                os.path.join(output_dir, 'vis'),
-                cls_boxes_i,
-                segms=cls_segms_i,
-                keypoints=cls_keyps_i,
-                thresh=cfg.VIS_TH,
-                box_alpha=0.8,
-                dataset=dataset,
-                show_class=True
-            )
+    #     if i % 10 == 0:  # Reduce log file size
+    #         ave_total_time = np.sum([t.average_time for t in timers.values()])
+    #         eta_seconds = ave_total_time * (num_images - i - 1)
+    #         eta = str(datetime.timedelta(seconds=int(eta_seconds)))
+    #         det_time = (
+    #             timers['im_detect_bbox'].average_time +
+    #             timers['im_detect_mask'].average_time +
+    #             timers['im_detect_keypoints'].average_time
+    #         )
+    #         misc_time = (
+    #             timers['misc_bbox'].average_time +
+    #             timers['misc_mask'].average_time +
+    #             timers['misc_keypoints'].average_time
+    #         )
+    #         logger.info(
+    #             (
+    #                 'im_detect: range [{:d}, {:d}] of {:d}: '
+    #                 '{:d}/{:d} {:.3f}s + {:.3f}s (eta: {})'
+    #             ).format(
+    #                 start_ind + 1, end_ind, total_num_images, start_ind + i + 1,
+    #                 start_ind + num_images, det_time, misc_time, eta
+    #             )
+    #         )
 
-    cfg_yaml = yaml.dump(cfg)
-    if ind_range is not None:
-        det_name = 'detection_range_%s_%s.pkl' % tuple(ind_range)
-    else:
-        det_name = 'detections.pkl'
-    det_file = os.path.join(output_dir, det_name)
-    save_object(
-        dict(
-            all_boxes=all_boxes,
-            all_segms=all_segms,
-            all_keyps=all_keyps,
-            cfg=cfg_yaml
-        ), det_file
-    )
-    logger.info('Wrote detections to: {}'.format(os.path.abspath(det_file)))
-    return all_boxes, all_segms, all_keyps
+    #     if cfg.VIS:
+    #         im_name = os.path.splitext(os.path.basename(entry['image']))[0]
+    #         vis_utils.vis_one_image(
+    #             im[:, :, ::-1],
+    #             '{:d}_{:s}'.format(i, im_name),
+    #             os.path.join(output_dir, 'vis'),
+    #             cls_boxes_i,
+    #             segms=global_cls_segms_i,
+    #             thresh=cfg.VIS_TH,
+    #             box_alpha=0.8,
+    #             dataset=dataset,
+    #             show_class=True
+    #         )
+
+    # cfg_yaml = yaml.dump(cfg)
+    # if ind_range is not None:
+    #     det_name = 'detection_range_%s_%s.pkl' % tuple(ind_range)
+    # else:
+    #     det_name = 'detections.pkl'
+    # det_file = os.path.join(output_dir, det_name)
+    # save_object(
+    #     dict(
+    #         all_boxes=all_boxes,
+    #         all_polygons=all_polygons,
+    #         all_strs=all_strs,
+    #         all_keyps=all_keyps,
+    #         cfg=cfg_yaml
+    #     ), det_file
+    # )
+    # logger.info('Wrote detections to: {}'.format(os.path.abspath(det_file)))
+    return all_boxes, all_polygons, all_strs, all_keyps
 
 
 def initialize_model_from_cfg():
@@ -235,7 +241,7 @@ def get_roidb_and_dataset(ind_range):
     """Get the roidb for the dataset specified in the global cfg. Optionally
     restrict it to a range of indices if ind_range is a pair of integers.
     """
-    dataset = JsonDataset(cfg.TEST.DATASET)
+    dataset = TextDataSet(cfg.TEST.DATASET)
     if cfg.MODEL.FASTER_RCNN:
         roidb = dataset.get_roidb()
     else:
@@ -273,9 +279,12 @@ def empty_results(num_classes, num_images):
     # Note: do not be tempted to use [[] * N], which gives N references to the
     # *same* empty list.
     all_boxes = [[[] for _ in range(num_images)] for _ in range(num_classes)]
-    all_segms = [[[] for _ in range(num_images)] for _ in range(num_classes)]
+    all_polygons = [[[] for _ in range(num_images)] for _ in range(num_classes)]
+    # all_global_segms = [[[] for _ in range(num_images)] for _ in range(num_classes)]
+    # all_char_segms = [[[] for _ in range(num_images)] for _ in range(37)]
+    all_strs = [[[] for _ in range(num_images)] for _ in range(num_classes)]
     all_keyps = [[[] for _ in range(num_images)] for _ in range(num_classes)]
-    return all_boxes, all_segms, all_keyps
+    return all_boxes, all_keyps, all_polygons, all_strs
 
 
 def extend_results(index, all_res, im_res):

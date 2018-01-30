@@ -45,10 +45,13 @@ import utils.boxes as box_utils
 import utils.image as image_utils
 import utils.keypoints as keypoint_utils
 
+from PIL import Image, ImageDraw, ImageFont
+import os
+
 logger = logging.getLogger(__name__)
 
 
-def im_detect_all(model, im, box_proposals, timers=None):
+def im_detect_all(model, im, im_index, box_proposals, timers=None, vis=True):
     if timers is None:
         timers = defaultdict(Timer)
 
@@ -70,35 +73,70 @@ def im_detect_all(model, im, box_proposals, timers=None):
     if cfg.MODEL.MASK_ON and boxes.shape[0] > 0:
         timers['im_detect_mask'].tic()
         if cfg.TEST.MASK_AUG.ENABLED:
-            masks = im_detect_mask_aug(model, im, boxes)
+            global_masks, char_masks = im_detect_mask_aug(model, im, boxes)
         else:
-            masks = im_detect_mask(model, im_scales, boxes)
+            global_masks, char_masks = im_detect_mask(model, im_scales, boxes)
         timers['im_detect_mask'].toc()
+        scale = im_scales[0]
+        # print(char_masks.shape)
+        # print(char_masks[0,0,:,:].max(), char_masks[0,0,:,:].min())
+        # raw_input()
+        if vis:
+            img_char = np.zeros((im.shape[0], im.shape[1]))
+            img_poly = np.zeros((im.shape[0], im.shape[1]))
+            img_draw = ImageDraw.Draw(Image.fromarray(im))
+        for index in range(global_masks.shape[0]):
+            box = boxes[index]
+            box = map(int, box)
+            box_w = box[2] - box[0]
+            box_h = box[3] - box[1]
+            cls_polys = (global_masks[index, 0, :, :]*255).astype(np.uint8)
+            poly_map = np.array(Image.fromarray(cls_polys).resize((box_w, box_h)))
+            poly_map = poly_map.astype(np.float32) / 255
+            poly_map=cv2.GaussianBlur(poly_map,(3,3),sigmaX=3)
+            a, poly_map=cv2.threshold(poly_map, 0.5 ,1, cv2.THRESH_BINARY)
+            SE1=cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
+            poly_map = cv2.erode(poly_map,SE1) 
+            poly_map = cv2.dilate(poly_map,SE1);
+            poly_map = cv2.morphologyEx(poly_map,cv2.MORPH_CLOSE,SE1)
+            idy,idx=np.where(poly_map == 1)
+            xy=np.vstack((idx,idy))
+            xy=np.transpose(xy)
+            hull = cv2.convexHull(xy, clockwise=True)
+            #reverse order of points.
+            hull=hull[::-1]
+            #find minimum area bounding box.
+            rect = cv2.minAreaRect(hull)
+            corners = cv2.boxPoints(rect)
+            corners = np.array(corners, dtype="int")
+            pts = get_tight_rect(corners, box[0], box[1], im.shape[0], im.shape[1], 1)
+            pts_origin = [x * 1.0 / scale for x in pts]
+            pts_origin = map(int, pts_origin)
+            text, rec_score = getstr(char_masks[index,:,:,:].copy(), box_w, box_h)
+            result_log = ([int(x * 1.0 / scale) for x in box[:4]] + pts_origin + [text] + [scores[index]] + [rec_score])
+            # print(result_log)
+            # raw_input()
+            if vis:    
+                img_draw.rectangle(box, outline=(255, 0, 0))
+                img_draw.polygon(pts, outline=(255, 225, 0), fill=(225,225,0,20))
+                fnt = ImageFont.truetype('./fonts/kaiti.ttf', 20)
+                img_draw.text((box[0], box[1]), text + ';' + str(scores[index])+ ';' + str(rec_score)[:4], font=fnt, fill = (0,0,225,255))
+                poly = np.array(Image.fromarray(cls_polys).resize((box_w, box_h))) 
+                cls_chars = 255 - (char_masks[index, 0, :, :]*255).astype(np.uint8)      
+                char = np.array(Image.fromarray(cls_chars).resize((box_w, box_h)))
+                img_poly[box[1]:box[3], box[0]:box[2]] = poly
+                img_char[box[1]:box[3], box[0]:box[2]] = char
 
-        timers['misc_mask'].tic()
-        cls_segms = segm_results(
-            cls_boxes, masks, boxes, im.shape[0], im.shape[1]
-        )
-        timers['misc_mask'].toc()
-    else:
-        cls_segms = None
-
-    if cfg.MODEL.KEYPOINTS_ON and boxes.shape[0] > 0:
-        timers['im_detect_keypoints'].tic()
-        if cfg.TEST.KPS_AUG.ENABLED:
-            heatmaps = im_detect_keypoints_aug(model, im, boxes)
-        else:
-            heatmaps = im_detect_keypoints(model, im_scales, boxes)
-        timers['im_detect_keypoints'].toc()
-
-        timers['misc_keypoints'].tic()
-        cls_keyps = keypoint_results(cls_boxes, heatmaps, boxes)
-        timers['misc_keypoints'].toc()
-    else:
-        cls_keyps = None
-
-    return cls_boxes, cls_segms, cls_keyps
-
+        if vis:
+            out_dir_img = './tests/visu/'
+            img_poly = Image.fromarray(img_poly).convert('RGB')
+            # img_poly.save(os.path.join(out_dir_img, imdb.image_set_index[img_index] + '_poly.jpg'))
+            img_char = Image.fromarray(img_char).convert('RGB')
+            # img_char.save(os.path.join(out_dir_img, imdb.image_set_index[img_index] + '_poly.jpg'))
+            Image.blend(Image.fromarray(im), img_poly, 0.5).save(os.path.join(out_dir_img, str(im_index) + '_blend_poly.jpg'))
+            Image.blend(Image.fromarray(im), img_char, 0.5).save(os.path.join(out_dir_img, str(im_index) + '_blend_char.jpg'))
+            # print('visu')
+            # raw_input()
 
 def im_conv_body_only(model, im):
     """Runs `model.conv_body_net` on the given image `im`."""
@@ -374,7 +412,8 @@ def im_detect_mask(model, im_scales, boxes):
     assert len(im_scales) == 1, \
         'Only single-image / single-scale batch implemented'
 
-    M = cfg.MRCNN.RESOLUTION
+    M_HEIGHT = cfg.MRCNN.RESOLUTION_H
+    M_WIDTH = cfg.MRCNN.RESOLUTION_W
     if boxes.shape[0] == 0:
         pred_masks = np.zeros((0, M, M), np.float32)
         return pred_masks
@@ -389,16 +428,21 @@ def im_detect_mask(model, im_scales, boxes):
     workspace.RunNet(model.mask_net.Proto().name)
 
     # Fetch masks
-    pred_masks = workspace.FetchBlob(
-        core.ScopedName('mask_fcn_probs')
+    pred_global_masks = workspace.FetchBlob(
+        core.ScopedName('mask_fcn_global_probs')
+    ).squeeze()
+    pred_char_masks = workspace.FetchBlob(
+        core.ScopedName('mask_fcn_char_probs')
     ).squeeze()
 
-    if cfg.MRCNN.CLS_SPECIFIC_MASK:
-        pred_masks = pred_masks.reshape([-1, cfg.MODEL.NUM_CLASSES, M, M])
-    else:
-        pred_masks = pred_masks.reshape([-1, 1, M, M])
+    # if cfg.MRCNN.CLS_SPECIFIC_MASK:
+    #     pred_masks = pred_masks.reshape([-1, cfg.MODEL.NUM_CLASSES, M_HEIGHT, M_WIDTH])
+    # else:
+    #     pred_masks = pred_masks.reshape([-1, 1, M_HEIGHT, M_WIDTH])
+    pred_global_masks = pred_global_masks.reshape([-1, 1, M_HEIGHT, M_WIDTH])
+    pred_char_masks = pred_char_masks.reshape([-1, 37, M_HEIGHT, M_WIDTH])
 
-    return pred_masks
+    return pred_global_masks, pred_char_masks
 
 
 def im_detect_mask_aug(model, im, boxes):
@@ -416,60 +460,73 @@ def im_detect_mask_aug(model, im, boxes):
         'Size dependent scaling not implemented'
 
     # Collect masks computed under different transformations
-    masks_ts = []
+    global_masks_ts = []
+    char_masks_ts = []
 
     # Compute masks for the original image (identity transform)
     im_scales_i = im_conv_body_only(model, im)
-    masks_i = im_detect_mask(model, im_scales_i, boxes)
-    masks_ts.append(masks_i)
+    global_masks_i, char_masks_i = im_detect_mask(model, im_scales_i, boxes)
+    global_masks_ts.append(global_masks_i)
+    char_masks_ts.append(char_masks_i)
 
     # Perform mask detection on the horizontally flipped image
     if cfg.TEST.MASK_AUG.H_FLIP:
-        masks_hf = im_detect_mask_hflip(model, im, boxes)
-        masks_ts.append(masks_hf)
+        global_masks_hf, char_masks_hf = im_detect_mask_hflip(model, im, boxes)
+        global_masks_ts.append(global_masks_hf)
+        char_masks_ts.append(char_masks_hf)
 
     # Compute detections at different scales
     for scale in cfg.TEST.MASK_AUG.SCALES:
         max_size = cfg.TEST.MASK_AUG.MAX_SIZE
-        masks_scl = im_detect_mask_scale(model, im, scale, max_size, boxes)
-        masks_ts.append(masks_scl)
+        global_masks_scl, char_masks_scl = im_detect_mask_scale(model, im, scale, max_size, boxes)
+        global_masks_ts.append(global_masks_scl)
+        char_masks_ts.append(char_masks_scl)
 
         if cfg.TEST.MASK_AUG.SCALE_H_FLIP:
-            masks_scl_hf = im_detect_mask_scale(
+            global_masks_scl_hf, char_masks_scl_hf = im_detect_mask_scale(
                 model, im, scale, max_size, boxes, hflip=True
             )
-            masks_ts.append(masks_scl_hf)
+            global_masks_ts.append(global_masks_scl_hf)
+            char_masks_ts.append(char_masks_scl_hf)
 
     # Compute masks at different aspect ratios
     for aspect_ratio in cfg.TEST.MASK_AUG.ASPECT_RATIOS:
-        masks_ar = im_detect_mask_aspect_ratio(model, im, aspect_ratio, boxes)
-        masks_ts.append(masks_ar)
+        global_masks_ar, char_masks_ar = im_detect_mask_aspect_ratio(model, im, aspect_ratio, boxes)
+        global_masks_ts.append(global_masks_ar)
+        char_masks_ts.append(char_masks_ar)
 
         if cfg.TEST.MASK_AUG.ASPECT_RATIO_H_FLIP:
-            masks_ar_hf = im_detect_mask_aspect_ratio(
+            global_masks_ar_hf, char_masks_ar_hf = im_detect_mask_aspect_ratio(
                 model, im, aspect_ratio, boxes, hflip=True
             )
-            masks_ts.append(masks_ar_hf)
+            global_masks_ts.append(global_masks_ar_hf)
+            char_masks_ts.append(char_masks_ar_hf)
 
     # Combine the predicted soft masks
     if cfg.TEST.MASK_AUG.HEUR == 'SOFT_AVG':
-        masks_c = np.mean(masks_ts, axis=0)
+        global_masks_c = np.mean(global_masks_ts, axis=0)
+        char_masks_c = np.mean(char_masks_ts, axis=0)
     elif cfg.TEST.MASK_AUG.HEUR == 'SOFT_MAX':
-        masks_c = np.amax(masks_ts, axis=0)
+        global_masks_c = np.amax(global_masks_ts, axis=0)
+        char_masks_c = np.amax(char_masks_ts, axis=0)
     elif cfg.TEST.MASK_AUG.HEUR == 'LOGIT_AVG':
 
         def logit(y):
             return -1.0 * np.log((1.0 - y) / np.maximum(y, 1e-20))
 
-        logit_masks = [logit(y) for y in masks_ts]
-        logit_masks = np.mean(logit_masks, axis=0)
-        masks_c = 1.0 / (1.0 + np.exp(-logit_masks))
+        global_logit_masks = [logit(y) for y in global_masks_ts]
+        global_logit_masks = np.mean(global_logit_masks, axis=0)
+        global_masks_c = 1.0 / (1.0 + np.exp(-global_logit_masks))
+
+        char_logit_masks = [logit(y) for y in char_masks_ts]
+        char_logit_masks = np.mean(char_logit_masks, axis=0)
+        char_masks_c = 1.0 / (1.0 + np.exp(-char_logit_masks))
     else:
         raise NotImplementedError(
             'Heuristic {} not supported'.format(cfg.TEST.MASK_AUG.HEUR)
         )
 
-    return masks_c
+    return global_masks_c, char_masks_c
 
 
 def im_detect_mask_hflip(model, im, boxes):
@@ -481,12 +538,13 @@ def im_detect_mask_hflip(model, im, boxes):
     boxes_hf = box_utils.flip_boxes(boxes, im.shape[1])
 
     im_scales = im_conv_body_only(model, im_hf)
-    masks_hf = im_detect_mask(model, im_scales, boxes_hf)
+    global_masks_hf, char_masks_hf = im_detect_mask(model, im_scales, boxes_hf)
 
     # Invert the predicted soft masks
-    masks_inv = masks_hf[:, :, :, ::-1]
+    global_masks_inv = global_masks_hf[:, :, :, ::-1]
+    char_masks_inv = char_masks_hf[:, :, :, ::-1]
 
-    return masks_inv
+    return global_masks_inv, char_masks_inv
 
 
 def im_detect_mask_scale(model, im, scale, max_size, boxes, hflip=False):
@@ -501,16 +559,16 @@ def im_detect_mask_scale(model, im, scale, max_size, boxes, hflip=False):
     cfg.TEST.MAX_SIZE = max_size
 
     if hflip:
-        masks_scl = im_detect_mask_hflip(model, im, boxes)
+        global_masks_scl, char_masks_scl = im_detect_mask_hflip(model, im, boxes)
     else:
         im_scales = im_conv_body_only(model, im)
-        masks_scl = im_detect_mask(model, im_scales, boxes)
+        global_masks_scl, char_masks_scl = im_detect_mask(model, im_scales, boxes)
 
     # Restore the original scale
     cfg.TEST.SCALES = orig_scales
     cfg.TEST.MAX_SIZE = orig_max_size
 
-    return masks_scl
+    return global_masks_scl, char_masks_scl
 
 
 def im_detect_mask_aspect_ratio(model, im, aspect_ratio, boxes, hflip=False):
@@ -521,12 +579,12 @@ def im_detect_mask_aspect_ratio(model, im, aspect_ratio, boxes, hflip=False):
     boxes_ar = box_utils.aspect_ratio(boxes, aspect_ratio)
 
     if hflip:
-        masks_ar = im_detect_mask_hflip(model, im_ar, boxes_ar)
+        global_masks_ar, char_masks_ar = im_detect_mask_hflip(model, im_ar, boxes_ar)
     else:
         im_scales = im_conv_body_only(model, im_ar)
-        masks_ar = im_detect_mask(model, im_scales, boxes_ar)
+        global_masks_ar, char_masks_ar = im_detect_mask(model, im_scales, boxes_ar)
 
-    return masks_ar
+    return global_masks_ar, char_masks_ar
 
 
 def im_detect_keypoints(model, im_scales, boxes):
@@ -817,20 +875,23 @@ def segm_results(cls_boxes, masks, ref_boxes, im_h, im_w):
     # prior to resizing back to the original image resolution. This prevents
     # "top hat" artifacts. We therefore need to expand the reference boxes by an
     # appropriate factor.
-    M = cfg.MRCNN.RESOLUTION
-    scale = (M + 2.0) / M
-    ref_boxes = box_utils.expand_boxes(ref_boxes, scale)
+    M_HEIGHT = cfg.MRCNN.RESOLUTION_H
+    M_WIDTH = cfg.MRCNN.RESOLUTION_W
+    scale_h = (M_HEIGHT + 2.0) / M_HEIGHT
+    scale_w = (M_WIDTH + 2.0) / M_WIDTH
+    ref_boxes = box_utils.expand_boxes_hw(ref_boxes, scale_h, scale_w)
     ref_boxes = ref_boxes.astype(np.int32)
-    padded_mask = np.zeros((M + 2, M + 2), dtype=np.float32)
+    padded_mask = np.zeros((M_HEIGHT + 2, M_WIDTH + 2), dtype=np.float32)
 
     # skip j = 0, because it's the background class
     for j in range(1, num_classes):
         segms = []
         for _ in range(cls_boxes[j].shape[0]):
-            if cfg.MRCNN.CLS_SPECIFIC_MASK:
-                padded_mask[1:-1, 1:-1] = masks[mask_ind, j, :, :]
-            else:
-                padded_mask[1:-1, 1:-1] = masks[mask_ind, 0, :, :]
+            # if cfg.MRCNN.CLS_SPECIFIC_MASK:
+            #     padded_mask[1:-1, 1:-1] = masks[mask_ind, j, :, :]
+            # else:
+            #     padded_mask[1:-1, 1:-1] = masks[mask_ind, 0, :, :]
+            padded_mask[1:-1, 1:-1] = masks[mask_ind, 0, :, :]
 
             ref_box = ref_boxes[mask_ind, :]
             w = ref_box[2] - ref_box[0] + 1
@@ -864,6 +925,161 @@ def segm_results(cls_boxes, masks, ref_boxes, im_h, im_w):
 
     assert mask_ind == masks.shape[0]
     return cls_segms
+
+def getstr(seg, box_w, box_h):
+    pos = 255 - (seg[0]*255).astype(np.uint8)
+    mask_index = np.argmax(seg, axis=0)
+    mask_index = mask_index.astype(np.uint8)
+    pos = pos.astype(np.uint8)
+    seg = seg*255
+    seg = seg.astype(np.uint8)
+    ## resize pos and mask_index
+
+    pos = np.array(Image.fromarray(pos).resize((box_w, box_h)))
+    seg_resize = np.zeros((seg.shape[0], box_h, box_w))
+    for i in range(seg.shape[0]):
+        seg_resize[i,:,:] = np.array(Image.fromarray(seg[i,:,:]).resize((box_w, box_h)))
+    mask_index = np.array(Image.fromarray(mask_index).resize((box_w, box_h), Image.NEAREST))
+    string, score = seg2text(pos, mask_index, seg_resize)
+    return string, score
+
+def char2num(char):
+    if char in '0123456789':
+        num = ord(char) - ord('0') + 1
+    elif char in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ':
+        num = ord(char.lower()) - ord('a') + 11
+    else:
+        print('error symbol')
+        exit()
+    return num
+
+def num2char(num):
+    if num >=1 and num <=10:
+        char = chr(ord('0') + num - 1)
+    elif num > 10 and num <= 36:
+        char = chr(ord('a') + num - 11)
+    else:
+        print('error number:%d'%(num))
+        exit()
+    return char
+
+def seg2text(gray, mask, seg):
+    ## input numpy
+    img_h, img_w = gray.shape
+    ret, thresh = cv2.threshold(gray, 192, 255, cv2.THRESH_BINARY)
+    im2, contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+    chars = []
+    scores = []
+    for i in range(len(contours)):
+        char = {}
+        temp = np.zeros((img_h, img_w)).astype(np.uint8)
+        cv2.drawContours(temp, [contours[i]], 0, (255), -1)
+        x, y, w, h = cv2.boundingRect(contours[i])
+        c_x, c_y = x + w/2, y + h/2
+        tmax = 0
+        sym = -1
+        score = 0
+        pixs = mask[temp == 255]
+        seg_contour = seg[:, temp == 255]
+        seg_contour = seg_contour.astype(np.float32) / 255
+        for j in range(1, 37):
+            tnum = (pixs == j).sum()
+            if tnum > tmax:
+                tmax = tnum
+                sym = j
+        if sym == -1:
+            continue
+        contour_score = seg_contour[sym,:].sum() / pixs.size
+        scores.append(contour_score)
+        sym = num2char(sym)
+        char['x'] = c_x
+        char['y'] = c_y
+        char['s'] = sym
+        chars.append(char)
+    chars = sorted(chars, key = lambda x: x['x'])
+    string = ''
+    for char in chars:
+        string = string + char['s']
+    if len(scores)>0:
+        score = sum(scores) / len(scores)
+    else:
+        score = 0.00
+    return string, score
+
+def get_tight_rect(points, start_x, start_y, image_height, image_width, scale):
+    points = list(points)
+    ps = sorted(points,key = lambda x:x[0])
+
+    if ps[1][1] > ps[0][1]:
+        px1 = ps[0][0] * scale + start_x
+        py1 = ps[0][1] * scale + start_y
+        px4 = ps[1][0] * scale + start_x
+        py4 = ps[1][1] * scale + start_y
+    else:
+        px1 = ps[1][0] * scale + start_x
+        py1 = ps[1][1] * scale + start_y
+        px4 = ps[0][0] * scale + start_x
+        py4 = ps[0][1] * scale + start_y
+    if ps[3][1] > ps[2][1]:
+        px2 = ps[2][0] * scale + start_x
+        py2 = ps[2][1] * scale + start_y
+        px3 = ps[3][0] * scale + start_x
+        py3 = ps[3][1] * scale + start_y
+    else:
+        px2 = ps[3][0] * scale + start_x
+        py2 = ps[3][1] * scale + start_y
+        px3 = ps[2][0] * scale + start_x
+        py3 = ps[2][1] * scale + start_y
+
+    if px1<0:
+        px1=1
+    if px1>image_width:
+        px1 = image_width - 1
+    if px2<0:
+        px2=1
+    if px2>image_width:
+        px2 = image_width - 1
+    if px3<0:
+        px3=1
+    if px3>image_width:
+        px3 = image_width - 1
+    if px4<0:
+        px4=1
+    if px4>image_width:
+        px4 = image_width - 1
+
+    if py1<0:
+        py1=1
+    if py1>image_height:
+        py1 = image_height - 1
+    if py2<0:
+        py2=1
+    if py2>image_height:
+        py2 = image_height - 1
+    if py3<0:
+        py3=1
+    if py3>image_height:
+        py3 = image_height - 1
+    if py4<0:
+        py4=1
+    if py4>image_height:
+        py4 = image_height - 1
+    return [px1, py1, px2, py2, px3, py3, px4, py4]
+
+def segm_char_results(cls_boxes, masks, ref_boxes, im_h, im_w):
+    num_classes = 37
+    char_strs = [[] for _ in range(cls_boxes[1].shape[0])]
+    char_strs_scores = [[] for _ in range(cls_boxes[1].shape[0])]
+
+    M_HEIGHT = cfg.MRCNN.RESOLUTION_H
+    M_WIDTH = cfg.MRCNN.RESOLUTION_W
+    for k in range(cls_boxes[1].shape[0]):
+        text, rec_score = getstr(masks[k,:,:,:], M_HEIGHT, M_WIDTH)
+        char_strs.append(text)
+        char_strs_scores.append(rec_score)
+        print(text, rec_score)
+
+    return char_strs, char_strs_scores
 
 
 def keypoint_results(cls_boxes, pred_heatmaps, ref_boxes):

@@ -31,6 +31,7 @@ if not os.path.exists(_CACHE_DIR):
 IM_DIR = 'im_dir'
 ANN_FN = 'ann_fn'
 IM_LIST='im_list'
+IM_PREFIX = 'image_prefix'
 
 # Available datasets
 DATASETS = {
@@ -58,7 +59,7 @@ DATASETS = {
         ANN_FN:
             _DATA_DIR + '/icdar2013/test_gts',
         IM_LIST:
-            _DATA_DIR + '/icdar2013/test_list.txt'
+            _DATA_DIR + '/icdar2013/test_list.txt',
     },
     'icdar2015_train': {
         IM_DIR:

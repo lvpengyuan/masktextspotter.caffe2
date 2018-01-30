@@ -242,6 +242,24 @@ def expand_boxes(boxes, scale):
 
     return boxes_exp
 
+def expand_boxes_hw(boxes, scale_h, scale_w):
+    """Expand an array of boxes by a given scale."""
+    w_half = (boxes[:, 2] - boxes[:, 0]) * .5
+    h_half = (boxes[:, 3] - boxes[:, 1]) * .5
+    x_c = (boxes[:, 2] + boxes[:, 0]) * .5
+    y_c = (boxes[:, 3] + boxes[:, 1]) * .5
+
+    w_half *= scale_w
+    h_half *= scale_h
+
+    boxes_exp = np.zeros(boxes.shape)
+    boxes_exp[:, 0] = x_c - w_half
+    boxes_exp[:, 2] = x_c + w_half
+    boxes_exp[:, 1] = y_c - h_half
+    boxes_exp[:, 3] = y_c + h_half
+
+    return boxes_exp
+
 
 def flip_boxes(boxes, im_width):
     """Flip boxes horizontally."""

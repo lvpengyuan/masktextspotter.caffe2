@@ -57,7 +57,7 @@ class TextDataSet(object):
         self.num_images = len(self.image_set_index)
         self.char_classes = '_0123456789abcdefghijklmnopqrstuvwxyz'
 
-    def get_roidb(self, gt=False, proposal_file=None, min_proposal_size=2, proposal_limit=-1, crowd_filter_thresh=0):
+    def get_roidb(self, gt=True, proposal_file=None, min_proposal_size=2, proposal_limit=-1, crowd_filter_thresh=0):
         """Return an roidb corresponding to the dataset. Optionally:
            - include ground truth boxes in the roidb
            - add proposals specified in a proposals file
