@@ -57,27 +57,24 @@ class TextDataSet(object):
         self.num_images = len(self.image_set_index)
         self.char_classes = '_0123456789abcdefghijklmnopqrstuvwxyz'
 
-    def get_roidb(self, gt=True, proposal_file=None, min_proposal_size=2, proposal_limit=-1, crowd_filter_thresh=0):
+    def get_roidb(self, gt=None, proposal_file=None, min_proposal_size=2, proposal_limit=-1, crowd_filter_thresh=0):
         """Return an roidb corresponding to the dataset. Optionally:
            - include ground truth boxes in the roidb
            - add proposals specified in a proposals file
            - filter proposals based on a minimum side length
            - filter proposals that intersect with crowd regions
         """
-        assert gt is True, \
-            'Crowd filter threshold must be 0 if ground-truth annotations ' \
-            'are not included.'
 
         assert proposal_file is None, 'Only gt_roidb is supported Now!!!'
         self.min_proposal_size = min_proposal_size
         self.keypoints = None
-        if gt:
-            self.debug_timer.tic()
-            roidb = self.gt_roidb()
-            logger.debug(
-                '_add_gt_annotations took {:.3f}s'.
-                format(self.debug_timer.toc(average=False))
-            )
+        self.debug_timer.tic()
+        roidb = self.gt_roidb()
+        logger.debug(
+            '_add_gt_annotations took {:.3f}s'.
+            format(self.debug_timer.toc(average=False))
+        )
+
         return roidb
 
     def load_image_set_index(self):
@@ -92,7 +89,10 @@ class TextDataSet(object):
         return image_file
 
     def gt_roidb(self):
-        cache_file = os.path.join(_CACHE_DIR, self.name + '_gt_roidb.pkl')
+        if self.set == 'train':
+            cache_file = os.path.join(_CACHE_DIR, self.name + '_gt_roidb.pkl')
+        else:
+            cache_file = os.path.join(_CACHE_DIR, self.name + '_val_roidb.pkl')
         if os.path.exists(cache_file):
             with open(cache_file, 'rb') as fid:
                 roidb = cPickle.load(fid)
@@ -105,6 +105,7 @@ class TextDataSet(object):
         with open(cache_file, 'wb') as fid:
             cPickle.dump(gt_roidb, fid, cPickle.HIGHEST_PROTOCOL)
         return gt_roidb
+
 
     def line2boxes(self, line):
         parts = line.strip().split(',')
@@ -210,52 +211,57 @@ class TextDataSet(object):
         roi_rec['height'] = size[1]
         roi_rec['width'] = size[0]
 
-        ## get objs
-        #keep_boxes: rectangle boxes, n*4
-        #keep_polygons: polygons boxes, n*8 corresponding to keep_boxes
-        #keep_charboxes: charboxes, n*10 corresponding to keep_boxes dim0-7 for loc information, dim8 for charbox class, dim9 to recoder the corresponding word box
-        words, keep_boxes, keep_polygons, keep_charboxes, seg_areas, segmentations = self.load_gt_from_txt(filename, size[1], size[0])
-        if DEBUG:
-            print('words', words)
-            print('keep_boxes', keep_boxes)
-            print('keep_polygons', keep_polygons)
-            print('keep_charboxes', keep_charboxes)
-            print('seg_areas', seg_areas)
-            print('segmentations', segmentations)
+        if self.set == 'train':
+
+            ## get objs
+            #keep_boxes: rectangle boxes, n*4
+            #keep_polygons: polygons boxes, n*8 corresponding to keep_boxes
+            #keep_charboxes: charboxes, n*10 corresponding to keep_boxes dim0-7 for loc information, dim8 for charbox class, dim9 to recoder the corresponding word box
+            words, keep_boxes, keep_polygons, keep_charboxes, seg_areas, segmentations = self.load_gt_from_txt(filename, size[1], size[0])
+            if DEBUG:
+                print('words', words)
+                print('keep_boxes', keep_boxes)
+                print('keep_polygons', keep_polygons)
+                print('keep_charboxes', keep_charboxes)
+                print('seg_areas', seg_areas)
+                print('segmentations', segmentations)
 
 
-        num_objs = keep_boxes.shape[0]
-        ## Note that, we use a flag(0/1) to decide whether a box can be traind end2end.
-        boxes = np.zeros((num_objs, 4), dtype=np.float32)
-        gt_classes = np.ones((num_objs), dtype=np.int32) ## we only have text class, so gt will be always 1.
-        
-        overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
-        overlaps.fill(-1)
-        box_to_gt_ind_map = np.array(range(num_objs))
-        iscrowd = np.zeros((num_objs), dtype=bool)
-        is_e2e = False
-        overlaps[:, 1] = 1
-        boxes[:, :4] = keep_boxes
-        # if self.image_name != 'icdar2015':-
-        #     boxes[:, 4] = 1
-        #     is_e2e = True
+            num_objs = keep_boxes.shape[0]
+            ## Note that, we use a flag(0/1) to decide whether a box can be traind end2end.
+            boxes = np.zeros((num_objs, 4), dtype=np.float32)
+            gt_classes = np.ones((num_objs), dtype=np.int32) ## we only have text class, so gt will be always 1.
+            
+            overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
+            overlaps.fill(-1)
+            box_to_gt_ind_map = np.array(range(num_objs))
+            iscrowd = np.zeros((num_objs), dtype=bool)
+            is_e2e = False
+            overlaps[:, 1] = 1
+            boxes[:, :4] = keep_boxes
+            # if self.image_name != 'icdar2015':-
+            #     boxes[:, 4] = 1
+            #     is_e2e = True
 
-        roi_rec.update({'boxes': boxes,                   ## np n*5
-                        'polygons': keep_polygons.astype(np.float32),        ## np n*8
-                        'charboxes': keep_charboxes.astype(np.float32),      ## np k*10
-                        'words': words,                   ## [[hello, h, e, l, l, o], ...]
-                        'gt_classes': gt_classes,         ## np n
-                        'gt_overlaps': scipy.sparse.csr_matrix(overlaps),          ## np n*2
-                        'max_classes': overlaps.argmax(axis=1),
-                        'max_overlaps': overlaps.max(axis=1),
-                        'flipped': False,
-                        'is_e2e': is_e2e,
-                        'seg_areas': seg_areas.astype(np.float32),
-                        'box_to_gt_ind_map': box_to_gt_ind_map.astype(np.int32),
-                        'segms': segmentations,
-                        'is_crowd': iscrowd
-                        })
-        return roi_rec
+            roi_rec.update({'boxes': boxes,                   ## np n*5
+                            'polygons': keep_polygons.astype(np.float32),        ## np n*8
+                            'charboxes': keep_charboxes.astype(np.float32),      ## np k*10
+                            'words': words,                   ## [[hello, h, e, l, l, o], ...]
+                            'gt_classes': gt_classes,         ## np n
+                            'gt_overlaps': scipy.sparse.csr_matrix(overlaps),          ## np n*2
+                            'max_classes': overlaps.argmax(axis=1),
+                            'max_overlaps': overlaps.max(axis=1),
+                            'flipped': False,
+                            'is_e2e': is_e2e,
+                            'seg_areas': seg_areas.astype(np.float32),
+                            'box_to_gt_ind_map': box_to_gt_ind_map.astype(np.int32),
+                            'segms': segmentations,
+                            'is_crowd': iscrowd
+                            })
+            return roi_rec
+        else:
+            return roi_rec
+
 
 
 
