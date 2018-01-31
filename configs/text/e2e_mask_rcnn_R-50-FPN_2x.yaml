@@ -4,14 +4,14 @@ MODEL:
   NUM_CLASSES: 2
   FASTER_RCNN: True
   MASK_ON: True
-NUM_GPUS: 1
+NUM_GPUS: 4
 SOLVER:
   WEIGHT_DECAY: 0.0001
   LR_POLICY: steps_with_decay
-  BASE_LR: 0.01  #icdar13 
+  BASE_LR: 0.0001  #icdar13 
   # BASE_LR: 0.005   #synth
   GAMMA: 0.1
-  MAX_ITER: 200000
+  MAX_ITER: 10000
   STEPS: [0, 120000, 160000]
 FPN:
   FPN_ON: True
@@ -38,16 +38,17 @@ MRCNN:
   MASK_BATCH_SIZE_PER_IM: 16
   WEIGHT_LOSS_MASK: 1.0
 TRAIN:
-  WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
+  # WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
+  WEIGHTS: ./train/synth_train/generalized_rcnn/model_final.pkl
   # DATASETS: ('icdar2013_train', 'icdar2015_train')
-  # DATASETS: ('icdar2013_train', )
-  DATASETS: ('synth_train', )
+  DATASETS: ('icdar2013_train', )
+  # DATASETS: ('synth_train', )
   SCALES: (800,)
   MAX_SIZE: 1333
   BATCH_SIZE_PER_IM: 512
   RPN_PRE_NMS_TOP_N: 2000  # Per FPN level
   AUTO_RESUME: False
-  SNAPSHOT_ITERS: 20000
+  SNAPSHOT_ITERS: 5000
 TEST:
   WEIGHTS: ./train/synth_train/generalized_rcnn/model_final.pkl
   DATASETS: ('icdar2013_test',)

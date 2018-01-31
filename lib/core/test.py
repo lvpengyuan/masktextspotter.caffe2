@@ -69,7 +69,14 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
     timers['misc_bbox'].tic()
     scores, boxes, cls_boxes = box_results_with_nms_and_limit(scores, boxes)
     timers['misc_bbox'].toc()
-
+    result_logs = []
+    model_path = cfg.TEST.WEIGHTS
+    model_name = model_path.split('/')[-1]
+    model_dir = model_path[0:len(model_path)-len(model_name)]
+    save_dir_res = os.path.join(model_dir, model_name+'_results')
+    
+    if not os.path.isdir(save_dir_res):
+        os.mkdir(save_dir_res)
     if cfg.MODEL.MASK_ON and boxes.shape[0] > 0:
         timers['im_detect_mask'].tic()
         if cfg.TEST.MASK_AUG.ENABLED:
@@ -78,7 +85,6 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
             global_masks, char_masks = im_detect_mask(model, im_scales, boxes)
         timers['im_detect_mask'].toc()
         scale = im_scales[0]
-        result_logs = []
         if vis:
             img_char = np.zeros((im.shape[0], im.shape[1]))
             img_poly = np.zeros((im.shape[0], im.shape[1]))
@@ -110,10 +116,10 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
             corners = cv2.boxPoints(rect)
             corners = np.array(corners, dtype="int")
             pts = get_tight_rect(corners, box[0], box[1], im.shape[0], im.shape[1], 1)
-            pts_origin = [x * 1.0 / scale for x in pts]
+            pts_origin = [x * 1.0 for x in pts]
             pts_origin = map(int, pts_origin)
             text, rec_score = getstr(char_masks[index,:,:,:].copy(), box_w, box_h)
-            result_log = [int(x * 1.0 / scale) for x in box[:4]] + pts_origin + [text] + [scores[index]] + [rec_score]
+            result_log = [int(x * 1.0) for x in box[:4]] + pts_origin + [text] + [scores[index]] + [rec_score]
             result_logs.append(result_log)
             if vis:    
                 img_draw.rectangle(box, outline=(255, 0, 0))
@@ -126,14 +132,6 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
                 char = np.array(Image.fromarray(cls_chars).resize((box_w, box_h)))
                 img_poly[box[1]:box[3], box[0]:box[2]] = poly
                 img_char[box[1]:box[3], box[0]:box[2]] = char
-
-        model_path = cfg.TEST.WEIGHTS
-        model_name = model_path.split('/')[-1]
-        model_dir = model_path[0:len(model_path)-len(model_name)]
-        save_dir_res = os.path.join(model_dir, model_name+'_results')
-        
-        if not os.path.isdir(save_dir_res):
-            os.mkdir(save_dir_res)
         
         if vis:
             save_dir_visu = os.path.join(model_dir, model_name+'_visu')
@@ -144,7 +142,7 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
             Image.blend(img, img_poly, 0.5).save(os.path.join(save_dir_visu, str(image_name) + '_blend_poly.jpg'))
             Image.blend(img, img_char, 0.5).save(os.path.join(save_dir_visu, str(image_name) + '_blend_char.jpg'))
 
-        format_output(save_dir_res, result_logs, image_name)
+    format_output(save_dir_res, result_logs, image_name)
 
 
 def format_output(out_dir, boxes, img_name):
