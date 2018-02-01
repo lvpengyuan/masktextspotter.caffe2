@@ -42,6 +42,7 @@ import random
 from shapely.geometry import box, Polygon 
 from shapely import affinity
 import math
+from PIL import Image, ImageDraw
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,7 @@ def get_minibatch(roidb):
             )
         else:
             # Fast R-CNN like models trained on precomputed proposals
-            valid = roi_data.fast_rcnn.add_fast_rcnn_blobs(blobs, im_scales, roidb)
+            valid = roi_data.fast_rcnn.add_fast_rcnn_blobs_rec(blobs, im_scales, roidb)
     else:
         im_blob, im_scales, new_roidb = _get_image_aug_blob(roidb)
         blobs['data'] = im_blob
@@ -105,7 +106,7 @@ def get_minibatch(roidb):
             )
         else:
             # Fast R-CNN like models trained on precomputed proposals
-            valid = roi_data.fast_rcnn.add_fast_rcnn_blobs(blobs, im_scales, new_roidb)
+            valid = roi_data.fast_rcnn.add_fast_rcnn_blobs_rec(blobs, im_scales, new_roidb)
     return blobs, valid
 
 
@@ -182,14 +183,15 @@ def _get_image_aug_blob(roidb):
         im=im[0]
         im_scale=im_scale[0]
         processed_ims.append(im)
-
-        im_info = [im.shape[1], im.shape[2], im_scale]
+        im_info = [im.shape[0], im.shape[1], im_scale]
         new_rec['boxes'] = _clip_boxes(np.round(boxes.copy() * im_scale), im_info[:2])
         new_rec['polygons'] = _clip_polygons(np.round(polygons.copy() * im_scale), im_info[:2])
         new_rec['charboxes'] = _resize_clip_char_boxes(charboxes.copy(), im_scale, im_info[:2])
         new_rec['im_info'] = im_info
         processed_roidb.append(new_rec)
         im_scales.append(1.0)
+
+        # _visualize_roidb(im, new_rec['boxes'], new_rec['polygons'], new_rec['charboxes'])
 
     # Create a blob to hold the input images
     blob = blob_utils.im_list_to_blob(processed_ims)
@@ -285,11 +287,6 @@ def _rotate_image(im, boxes, polygons, charboxes):
         if charboxes[:, -1].mean() != -1:
             new_charboxes[:, :8] = _rotate_polygons(charboxes[:, :8], -1*delta, (r_width/2, r_height/2))
     return im, new_boxes, new_polygons, new_charboxes
-
-def _check_box(box, flag):
-    if box[0]>=box[2] or box[1]>=box[3]:
-        print(box)
-        print('*****************************************************************************************'+str(flag))
 
 def _rotate_polygons(polygons, angle, r_c):
     ## polygons: N*8
@@ -408,3 +405,29 @@ def _boxlist2quads(boxlist):
         # print(box)
         res[i] = np.array([box[0][0], box[0][1], box[1][0], box[1][1], box[2][0], box[2][1], box[3][0], box[3][1]])
     return res
+
+def _visualize_roidb(im, boxes, polygons, charboxes):
+    lex = '_0123456789abcdefghijklmnopqrstuvwxyz'
+    img = np.array(im, dtype=np.uint8)
+    img = Image.fromarray(img)
+    img_draw = ImageDraw.Draw(img)
+    for i in range(boxes.shape[0]):
+        color = _random_color()
+        img_draw.rectangle(list(boxes[i][:4]), outline=color)
+        img_draw.polygon(list(polygons[i]), outline=color)
+        choose_cboxes = charboxes[np.where(charboxes[:, -1] == i)[0], :]
+        for j in range(choose_cboxes.shape[0]):
+            img_draw.polygon(list(choose_cboxes[j][:8]), outline=color)
+            char = lex[int(choose_cboxes[j][8])]
+            img_draw.text(list(choose_cboxes[j][:2]), char)
+
+    img.save('./tests/visu/' + 'demo.jpg')
+    print('image saved')
+    raw_input()
+
+def _random_color():
+    r = random.randint(0, 255)
+    g = random.randint(0, 255)
+    b = random.randint(0, 255)
+
+    return (r, g, b)
