@@ -67,39 +67,40 @@ def get_minibatch(roidb):
     # single tensor, hence we initialize each blob to an empty list
     blobs = {k: [] for k in get_minibatch_blob_names()}
     # Get the input image blob, formatted for caffe2
-    # im_blob, im_scales = _get_image_blob(roidb)
-    # blobs['data'] = im_blob
-    # if cfg.RPN.RPN_ON:
-    #     # RPN-only or end-to-end Faster/Mask R-CNN
-    #     valid = roi_data.rpn.add_rpn_blobs(blobs, im_scales, roidb)
-    # elif cfg.RETINANET.RETINANET_ON:
-    #     im_width, im_height = im_blob.shape[3], im_blob.shape[2]
-    #     # im_width, im_height corresponds to the network input: padded image
-    #     # (if needed) width and height. We pass it as input and slice the data
-    #     # accordingly so that we don't need to use SampleAsOp
-    #     valid = roi_data.retinanet.add_retinanet_blobs(
-    #         blobs, im_scales, roidb, im_width, im_height
-    #     )
-    # else:
-    #     # Fast R-CNN like models trained on precomputed proposals
-    #     valid = roi_data.fast_rcnn.add_fast_rcnn_blobs(blobs, im_scales, roidb)
-
-    im_blob, im_scales, new_roidb = _get_image_aug_blob(roidb)
-    blobs['data'] = im_blob
-    if cfg.RPN.RPN_ON:
-        # RPN-only or end-to-end Faster/Mask R-CNN
-        valid = roi_data.rpn.add_rpn_blobs(blobs, im_scales, new_roidb)
-    elif cfg.RETINANET.RETINANET_ON:
-        im_width, im_height = im_blob.shape[3], im_blob.shape[2]
-        # im_width, im_height corresponds to the network input: padded image
-        # (if needed) width and height. We pass it as input and slice the data
-        # accordingly so that we don't need to use SampleAsOp
-        valid = roi_data.retinanet.add_retinanet_blobs(
-            blobs, im_scales, new_roidb, im_width, im_height
-        )
+    if not cfg.IMAGE.aug:
+        im_blob, im_scales = _get_image_blob(roidb)
+        blobs['data'] = im_blob
+        if cfg.RPN.RPN_ON:
+            # RPN-only or end-to-end Faster/Mask R-CNN
+            valid = roi_data.rpn.add_rpn_blobs(blobs, im_scales, roidb)
+        elif cfg.RETINANET.RETINANET_ON:
+            im_width, im_height = im_blob.shape[3], im_blob.shape[2]
+            # im_width, im_height corresponds to the network input: padded image
+            # (if needed) width and height. We pass it as input and slice the data
+            # accordingly so that we don't need to use SampleAsOp
+            valid = roi_data.retinanet.add_retinanet_blobs(
+                blobs, im_scales, roidb, im_width, im_height
+            )
+        else:
+            # Fast R-CNN like models trained on precomputed proposals
+            valid = roi_data.fast_rcnn.add_fast_rcnn_blobs(blobs, im_scales, roidb)
     else:
-        # Fast R-CNN like models trained on precomputed proposals
-        valid = roi_data.fast_rcnn.add_fast_rcnn_blobs(blobs, im_scales, new_roidb)
+        im_blob, im_scales, new_roidb = _get_image_aug_blob(roidb)
+        blobs['data'] = im_blob
+        if cfg.RPN.RPN_ON:
+            # RPN-only or end-to-end Faster/Mask R-CNN
+            valid = roi_data.rpn.add_rpn_blobs(blobs, im_scales, new_roidb)
+        elif cfg.RETINANET.RETINANET_ON:
+            im_width, im_height = im_blob.shape[3], im_blob.shape[2]
+            # im_width, im_height corresponds to the network input: padded image
+            # (if needed) width and height. We pass it as input and slice the data
+            # accordingly so that we don't need to use SampleAsOp
+            valid = roi_data.retinanet.add_retinanet_blobs(
+                blobs, im_scales, new_roidb, im_width, im_height
+            )
+        else:
+            # Fast R-CNN like models trained on precomputed proposals
+            valid = roi_data.fast_rcnn.add_fast_rcnn_blobs(blobs, im_scales, new_roidb)
     return blobs, valid
 
 
