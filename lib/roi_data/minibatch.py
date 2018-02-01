@@ -38,6 +38,11 @@ import roi_data.retinanet
 import roi_data.rpn
 import utils.blob as blob_utils
 
+import random
+from shapely.geometry import box, Polygon 
+from shapely import affinity
+import math
+
 logger = logging.getLogger(__name__)
 
 
@@ -251,7 +256,7 @@ def _rotate_image(im, boxes, polygons, charboxes):
         height, width, _ = im.shape
         ## get the minimal rect to cover the rotated image
         img_box = np.array([[0, 0, width, 0, width, height, 0, height]])
-        rotated_img_box = quad2minrect(rotate_polygons(img_box, -1*delta, (width/2, height/2)))
+        rotated_img_box = _quad2minrect(_rotate_polygons(img_box, -1*delta, (width/2, height/2)))
         r_height = int(max(rotated_img_box[0][3], rotated_img_box[0][1]) - min(rotated_img_box[0][3], rotated_img_box[0][1]))
         r_width = int(max(rotated_img_box[0][2], rotated_img_box[0][0]) - min(rotated_img_box[0][2], rotated_img_box[0][0]))
 
@@ -261,8 +266,8 @@ def _rotate_image(im, boxes, polygons, charboxes):
         end_h, end_w = start_h + height, start_w + width
         im_padding[start_h:end_h, start_w:end_w, :] = im
         ## get new boxes, polygons, charboxes
-        boxes[:, :-1:2] += start_w
-        boxes[:, 1:-1:2] += start_h
+        boxes[:, 0::2] += start_w
+        boxes[:, 1::2] += start_h
         polygons[:, ::2] += start_w
         polygons[:, 1::2] += start_h
         charboxes[:, :8:2] += start_w
@@ -273,13 +278,37 @@ def _rotate_image(im, boxes, polygons, charboxes):
 
         ## get new boxes
         ## gt
-        new_boxes[:, :4] = quad2minrect(rotate_polygons(rect2quad(boxes), -1*delta, (r_width/2, r_height/2)))
+        new_boxes[:, :4] = _quad2minrect(_rotate_polygons(_rect2quad(boxes), -1*delta, (r_width/2, r_height/2)))
         ## polygons
-        new_polygons = rotate_polygons(polygons, -1*delta, (r_width/2, r_height/2))
+        new_polygons = _rotate_polygons(polygons, -1*delta, (r_width/2, r_height/2))
         ## charboxes
         if charboxes[:, -1].mean() != -1:
-            new_charboxes[:, :8] = rotate_polygons(charboxes[:, :8], -1*delta, (r_width/2, r_height/2))
+            new_charboxes[:, :8] = _rotate_polygons(charboxes[:, :8], -1*delta, (r_width/2, r_height/2))
     return im, new_boxes, new_polygons, new_charboxes
+
+def _check_box(box, flag):
+    if box[0]>=box[2] or box[1]>=box[3]:
+        print(box)
+        print('*****************************************************************************************'+str(flag))
+
+def _rotate_polygons(polygons, angle, r_c):
+    ## polygons: N*8
+    ## r_x: rotate center x
+    ## r_y: rotate center y
+    ## angle: -15~15
+
+    poly_list = _quad2boxlist(polygons)
+    rotate_boxes_list = []
+    for poly in poly_list:
+        box = Polygon(poly)
+        rbox = affinity.rotate(box, angle, r_c)
+        if len(list(rbox.exterior.coords))<5:
+            print(poly)
+            print(rbox)
+        # assert(len(list(rbox.exterior.coords))>=5)
+        rotate_boxes_list.append(rbox.boundary.coords[:-1])
+    res = _boxlist2quads(rotate_boxes_list)
+    return res
 
 def _random_saturation(im):
     if cfg.IMAGE:
@@ -353,3 +382,29 @@ def _random_brightness(im):
         delta = random.uniform(-1*delta, delta)
         im += delta
     return im
+
+def _rect2quad(boxes):
+    x_min, y_min, x_max, y_max = boxes[:, 0].reshape((-1, 1)), boxes[:, 1].reshape((-1, 1)), boxes[:, 2].reshape((-1, 1)), boxes[:, 3].reshape((-1, 1))
+    return np.hstack((x_min, y_min, x_max, y_min, x_max, y_max, x_min, y_max))
+
+def _quad2rect(boxes):
+    ## only support rectangle
+    return np.hstack((boxes[:, 0].reshape((-1, 1)), boxes[:, 1].reshape((-1, 1)), boxes[:, 4].reshape((-1, 1)), boxes[:, 5].reshape((-1, 1))))
+
+def _quad2minrect(boxes):
+    ## trans a quad(N*4) to a rectangle(N*4) which has miniual area to cover it
+    return np.hstack((boxes[:, ::2].min(axis=1).reshape((-1, 1)), boxes[:, 1::2].min(axis=1).reshape((-1, 1)), boxes[:, ::2].max(axis=1).reshape((-1, 1)), boxes[:, 1::2].max(axis=1).reshape((-1, 1))))
+
+
+def _quad2boxlist(boxes):
+    res = []
+    for i in range(boxes.shape[0]):
+        res.append([[boxes[i][0], boxes[i][1]], [boxes[i][2], boxes[i][3]], [boxes[i][4], boxes[i][5]], [boxes[i][6], boxes[i][7]]])
+    return res
+
+def _boxlist2quads(boxlist):
+    res = np.zeros((len(boxlist), 8))
+    for i, box in enumerate(boxlist):
+        # print(box)
+        res[i] = np.array([box[0][0], box[0][1], box[1][0], box[1][1], box[2][0], box[2][1], box[3][0], box[3][1]])
+    return res
