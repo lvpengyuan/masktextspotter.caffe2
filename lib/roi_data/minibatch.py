@@ -141,7 +141,9 @@ def _get_image_aug_blob(roidb):
     )
     processed_ims = []
     im_scales = []
+    processed_roidb = []
     for i in range(num_images):
+        roi_rec = roidb[i]
         im = cv2.imread(roidb[i]['image'])
         if roidb[i]['flipped']:
             im = im[:, ::-1, :]
@@ -153,7 +155,7 @@ def _get_image_aug_blob(roidb):
         polygons = roi_rec['polygons'].copy()
         charboxes = roi_rec['charboxes'].copy()
 
-        if cfg.TRAIN.aug:
+        if cfg.IMAGE.aug:
             im, boxes, polygons, charboxes = _rotate_image(im, boxes, polygons, charboxes)
             im = _random_saturation(im)
             im = _random_hue(im)
@@ -175,11 +177,10 @@ def _get_image_aug_blob(roidb):
         im_scale=im_scale[0]
         processed_ims.append(im)
 
-        
-        im_info = [im.shape[2], im.shape[3], im_scale]
-        new_rec['boxes'] = clip_boxes(np.round(boxes.copy() * im_scale), im_info[:2])
-        new_rec['polygons'] = clip_polygons(np.round(polygons.copy() * im_scale), im_info[:2])
-        new_rec['charboxes'] = resize_clip_char_boxes(charboxes.copy(), im_scale, im_info[:2])
+        im_info = [im.shape[1], im.shape[2], im_scale]
+        new_rec['boxes'] = _clip_boxes(np.round(boxes.copy() * im_scale), im_info[:2])
+        new_rec['polygons'] = _clip_polygons(np.round(polygons.copy() * im_scale), im_info[:2])
+        new_rec['charboxes'] = _resize_clip_char_boxes(charboxes.copy(), im_scale, im_info[:2])
         new_rec['im_info'] = im_info
         processed_roidb.append(new_rec)
         im_scales.append(1.0)
@@ -188,6 +189,50 @@ def _get_image_aug_blob(roidb):
     blob = blob_utils.im_list_to_blob(processed_ims)
 
     return blob, im_scales, processed_roidb
+
+def _clip_boxes(boxes, im_shape):
+    """
+    Clip boxes to image boundaries.
+    :param boxes: [N, 4* num_classes]
+    :param im_shape: tuple of 2
+    :return: [N, 4* num_classes]
+    """
+    # x1 >= 0
+    boxes[:, 0::4] = np.maximum(np.minimum(boxes[:, 0::4], im_shape[1] - 1), 0)
+    # y1 >= 0
+    boxes[:, 1::4] = np.maximum(np.minimum(boxes[:, 1::4], im_shape[0] - 1), 0)
+    # x2 < im_shape[1]
+    boxes[:, 2::4] = np.maximum(np.minimum(boxes[:, 2::4], im_shape[1] - 1), 0)
+    # y2 < im_shape[0]
+    boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], im_shape[0] - 1), 0)
+    return boxes
+
+def _clip_polygons(polygons, im_shape):
+    """
+    Clip polygons to image boundaries.
+    :param polygons: [N, 4* num_classes]
+    :param im_shape: tuple of 2
+    :return: [N, 4* num_classes]
+    """
+    # x1 >= 0
+    polygons[:, 0:8:2] = np.maximum(np.minimum(polygons[:, 0:8:2], im_shape[1] - 1), 0)
+    # y1 >= 0
+    polygons[:, 1:8:2] = np.maximum(np.minimum(polygons[:, 1:8:2], im_shape[0] - 1), 0)
+    return polygons
+
+def _resize_clip_char_boxes(polygons, im_scale, im_shape):
+    """
+    Clip polygons to image boundaries.
+    :param polygons: [N, 4* num_classes]
+    :param im_shape: tuple of 2
+    :return: [N, 4* num_classes]
+    """
+    # x1 >= 0
+    polygons[:, :8] = np.round(polygons[:, :8]*im_scale)
+    polygons[:, 0:8:2] = np.maximum(np.minimum(polygons[:, 0:8:2], im_shape[1] - 1), 0)
+    # y1 >= 0
+    polygons[:, 1:8:2] = np.maximum(np.minimum(polygons[:, 1:8:2], im_shape[0] - 1), 0)
+    return polygons
 
 def _rotate_image(im, boxes, polygons, charboxes):
     if cfg.IMAGE: 
