@@ -500,7 +500,7 @@ __C.RETINANET = AttrDict()
 __C.RETINANET.RETINANET_ON = False
 
 # Anchor aspect ratios to use
-__C.RETINANET.ASPECT_RATIOS = (0.5, 1.0, 2.0)
+__C.RETINANET.ASPECT_RATIOS = (0.25, 0.5, 1.0, 2.0, 4.0)
 
 # Anchor scales per octave
 __C.RETINANET.SCALES_PER_OCTAVE = 3
@@ -719,7 +719,8 @@ __C.FPN.RPN_MAX_LEVEL = 6
 # Finest level of the FPN pyramid
 __C.FPN.RPN_MIN_LEVEL = 2
 # FPN RPN anchor aspect ratios
-__C.FPN.RPN_ASPECT_RATIOS = (0.5, 1, 2)
+# __C.FPN.RPN_ASPECT_RATIOS = (0.5, 1, 2)
+__C.FPN.RPN_ASPECT_RATIOS = (0.25, 0.5, 1, 2, 4)
 # RPN anchors start at this size on RPN_MIN_LEVEL
 # The anchor size doubled each level after that
 # With a default of 32 and levels 2 to 6, we get anchor sizes of 32 to 512
@@ -727,7 +728,7 @@ __C.FPN.RPN_ANCHOR_START_SIZE = 32
 # Use extra FPN levels, as done in the RetinaNet paper
 __C.FPN.EXTRA_CONV_LEVELS = False
 
-
+__C.FPN.USE_DEFORMABLE = True
 # ---------------------------------------------------------------------------- #
 # Mask R-CNN options ("MRCNN" means Mask R-CNN)
 # ---------------------------------------------------------------------------- #

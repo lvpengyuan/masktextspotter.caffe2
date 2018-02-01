@@ -29,13 +29,14 @@ from core.config import cfg
 # Bits for specific architectures (ResNet50, ResNet101, ...)
 # ---------------------------------------------------------------------------- #
 
+use_deformable = cfg.FPN.USE_DEFORMABLE
 
 def add_ResNet50_conv4_body(model):
     return add_ResNet_convX_body(model, (3, 4, 6))
 
 
 def add_ResNet50_conv5_body(model):
-    return add_ResNet_convX_body(model, (3, 4, 6, 3))
+    return add_ResNet_convX_body(model, (3, 4, 6, 3), use_deformable=use_deformable)
 
 
 def add_ResNet101_conv4_body(model):
@@ -64,7 +65,8 @@ def add_stage(
     dim_out,
     dim_inner,
     dilation,
-    stride_init=2
+    stride_init=2,
+    use_deformable=False,
 ):
     """Add a ResNet stage to the model by stacking n residual blocks."""
     # e.g., prefix = res2
@@ -80,13 +82,14 @@ def add_stage(
             stride_init,
             # Not using inplace for the last block;
             # it may be fetched externally or used by FPN
-            inplace_sum=i < n - 1
+            inplace_sum=i < n - 1,
+            use_deformable=use_deformable
         )
         dim_in = dim_out
     return blob_in, dim_in
 
 
-def add_ResNet_convX_body(model, block_counts, freeze_at=2):
+def add_ResNet_convX_body(model, block_counts, freeze_at=2, use_deformable=False):
     """Add a ResNet body from input data up through the res5 (aka conv5) stage.
     The final res5/conv5 stage may be optionally excluded (hence convX, where
     X = 4 or 5)."""
@@ -97,25 +100,25 @@ def add_ResNet_convX_body(model, block_counts, freeze_at=2):
     p = model.MaxPool(p, 'pool1', kernel=3, pad=1, stride=2)
     dim_in = 64
     dim_bottleneck = cfg.RESNETS.NUM_GROUPS * cfg.RESNETS.WIDTH_PER_GROUP
-    (n1, n2, n3) = block_counts[:3]
+    (n1, n2, n3) = block_counts[:3] #3,4,6
     s, dim_in = add_stage(model, 'res2', p, n1, dim_in, 256, dim_bottleneck, 1)
     if freeze_at == 2:
         model.StopGradient(s, s)
     s, dim_in = add_stage(
-        model, 'res3', s, n2, dim_in, 512, dim_bottleneck * 2, 1
+        model, 'res3', s, n2, dim_in, 512, dim_bottleneck * 2, 1, use_deformable=use_deformable
     )
     if freeze_at == 3:
         model.StopGradient(s, s)
     s, dim_in = add_stage(
-        model, 'res4', s, n3, dim_in, 1024, dim_bottleneck * 4, 1
+        model, 'res4', s, n3, dim_in, 1024, dim_bottleneck * 4, 1, use_deformable=use_deformable
     )
     if freeze_at == 4:
         model.StopGradient(s, s)
     if len(block_counts) == 4:
-        n4 = block_counts[3]
+        n4 = block_counts[3] #3
         s, dim_in = add_stage(
             model, 'res5', s, n4, dim_in, 2048, dim_bottleneck * 8,
-            cfg.RESNETS.RES5_DILATION
+            cfg.RESNETS.RES5_DILATION, use_deformable=use_deformable
         )
         if freeze_at == 5:
             model.StopGradient(s, s)
@@ -157,7 +160,8 @@ def add_residual_block(
     dim_inner,
     dilation,
     stride_init=2,
-    inplace_sum=False
+    inplace_sum=False,
+    use_deformable=False
 ):
     """Add a residual block to the model."""
     # prefix = res<stage>_<sub_stage>, e.g., res2_3
@@ -178,7 +182,8 @@ def add_residual_block(
         prefix,
         dim_inner,
         group=cfg.RESNETS.NUM_GROUPS,
-        dilation=dilation
+        dilation=dilation,
+        use_deformable=use_deformable
     )
 
     # sum -> ReLU
@@ -221,7 +226,8 @@ def bottleneck_transformation(
     prefix,
     dim_inner,
     dilation=1,
-    group=1
+    group=1,
+    use_deformable=False
 ):
     """Add a bottleneck transformation to the model."""
     # In original resnet, stride=2 is on 1x1.
@@ -241,19 +247,51 @@ def bottleneck_transformation(
     )
     cur = model.Relu(cur, cur)
 
-    # conv 3x3 -> BN -> ReLU
-    cur = model.ConvAffine(
-        cur,
-        prefix + '_branch2b',
-        dim_inner,
-        dim_inner,
-        kernel=3,
-        stride=str3x3,
-        pad=1 * dilation,
-        dilation=dilation,
-        group=group,
-        inplace=True
-    )
+    if use_deformable:
+        deformable_dict = {'res3_4': 128, 'res4_6': 256, 'res5_1': 512, 'res5_2': 512, 'res5_3': 512}
+        if prefix in deformable_dict:
+            # deformable conv
+            # conv 3x3 -> BN -> ReLU
+            cur = model.ConvAffineDeformable(
+                cur,
+                prefix + '_branch2b',
+                dim_inner,
+                dim_inner,
+                kernel=3,
+                stride=str3x3,
+                pad=1 * dilation,
+                dilation=dilation,
+                group=group,
+                inplace=True
+            )
+        else:
+            # conv 3x3 -> BN -> ReLU
+            cur = model.ConvAffine(
+                cur,
+                prefix + '_branch2b',
+                dim_inner,
+                dim_inner,
+                kernel=3,
+                stride=str3x3,
+                pad=1 * dilation,
+                dilation=dilation,
+                group=group,
+                inplace=True
+            )
+    else:
+        # conv 3x3 -> BN -> ReLU
+        cur = model.ConvAffine(
+            cur,
+            prefix + '_branch2b',
+            dim_inner,
+            dim_inner,
+            kernel=3,
+            stride=str3x3,
+            pad=1 * dilation,
+            dilation=dilation,
+            group=group,
+            inplace=True
+        )
     cur = model.Relu(cur, cur)
 
     # conv 1x1 -> BN (no ReLU)

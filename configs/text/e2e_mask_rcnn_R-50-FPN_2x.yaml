@@ -8,15 +8,16 @@ NUM_GPUS: 4
 SOLVER:
   WEIGHT_DECAY: 0.0001
   LR_POLICY: steps_with_decay
-  BASE_LR: 0.0001  #icdar13 
-  # BASE_LR: 0.005   #synth
+  # BASE_LR: 0.0001  #icdar13 
+  BASE_LR: 0.005   #synth
   GAMMA: 0.1
-  MAX_ITER: 10000
+  MAX_ITER: 200000
   STEPS: [0, 120000, 160000]
 FPN:
   FPN_ON: True
   MULTILEVEL_ROIS: True
   MULTILEVEL_RPN: True
+  USE_DEFORMABLE: True
 FAST_RCNN:
   ROI_BOX_HEAD: fast_rcnn_heads.add_roi_2mlp_head
   ROI_XFORM_METHOD: RoIAlign
@@ -34,21 +35,22 @@ MRCNN:
   ROI_XFORM_SAMPLING_RATIO: 2  # default 0
   DILATION: 1  # default 2
   CONV_INIT: MSRAFill  # default GaussianFill
-  IS_E2E: False
+  IS_E2E: True
   MASK_BATCH_SIZE_PER_IM: 16
   WEIGHT_LOSS_MASK: 1.0
 TRAIN:
-  # WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
-  WEIGHTS: ./train/synth_train/generalized_rcnn/model_final.pkl
+  WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
+  # WEIGHTS: ./train/synth_train/generalized_rcnn/model_final.pkl
   # DATASETS: ('icdar2013_train', 'icdar2015_train')
-  DATASETS: ('icdar2013_train', )
-  # DATASETS: ('synth_train', )
+  # DATASETS: ('icdar2013_train', )
+  DATASETS: ('synth_train', )
   SCALES: (800,)
   MAX_SIZE: 1333
   BATCH_SIZE_PER_IM: 512
   RPN_PRE_NMS_TOP_N: 2000  # Per FPN level
   AUTO_RESUME: False
-  SNAPSHOT_ITERS: 5000
+  SNAPSHOT_ITERS: 20000
+  IMS_PER_BATCH: 2
 TEST:
   WEIGHTS: ./train/synth_train/generalized_rcnn/model_final.pkl
   DATASETS: ('icdar2013_test',)

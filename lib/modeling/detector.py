@@ -26,6 +26,8 @@ import logging
 from caffe2.python import cnn
 from caffe2.python import core
 from caffe2.python import workspace
+from caffe2.python.modeling import initializers
+from caffe2.python.modeling.parameter_info import ParameterTags
 
 from core.config import cfg
 from ops.collect_and_distribute_fpn_rpn_proposals \
@@ -466,6 +468,121 @@ class DetectionModelHelper(cnn.CNNModelHelper):
             conv_blob, prefix + suffix, inplace=inplace
         )
         return blob_out
+
+    def ConvAffineDeformable(  # args in the same order of Conv()
+        self, blob_in, prefix, dim_in, dim_out, kernel, stride, pad,
+        group=1, dilation=1,
+        weight_init=None,
+        bias_init=None,
+        suffix='_bn',
+        inplace=False
+    ):
+        """ConvAffine adds a Conv op followed by a AffineChannel op (which
+        replaces BN during fine tuning).
+        """
+        conv_offset = self.Conv(
+            blob_in,
+            prefix + '_offset',
+            dim_in,
+            72,
+            kernel,
+            pad=pad,
+            group=group,
+            dilation=dilation,
+            weight_init=('ConstantFill', {'value': 0.}),
+            bias_init=('ConstantFill', {'value': 0.}),
+            no_bias=1
+        )
+        conv_blob = self.DeformableConv(
+            blob_in,
+            conv_offset,
+            prefix,
+            dim_in,
+            dim_out,
+            kernel,
+            stride=stride,
+            pad=pad,
+            group=group,
+            weight_init=weight_init,
+            bias_init=bias_init,
+            dilation=dilation,
+            no_bias=1,
+            deformable_group=4
+        )
+        blob_out = self.AffineChannel(
+            conv_blob, prefix + suffix, inplace=inplace
+        )
+        return blob_out
+
+    def DeformableConv(self, blob_in, offset, prefix, dim_in, dim_out, kernel, stride=1, pad=1, weight_init=None, 
+        bias_init=None,  WeightInitializer=None, BiasInitializer=None, dilation=1, no_bias=1, group=1, deformable_group=4, order="NCHW",
+        cudnn_exhaustive_search=False, **kwargs):
+        kernels = []
+        if isinstance(kernel, list):
+            assert len(kernel) == 2, "Conv support only a 2D kernel."
+            kernels = kernel
+        else:
+            kernels = [kernel] * 2
+
+        blob_out = prefix
+        weight_shape = [dim_out]
+        if order == "NCHW":
+            weight_shape.append(int(dim_in / group))
+            weight_shape.extend(kernels)
+        else:
+            weight_shape.extend(kernels)
+            weight_shape.append(int(dim_in / group))
+        WeightInitializer = initializers.update_initializer(
+            WeightInitializer, weight_init, ("XavierFill", {})
+        )
+        BiasInitializer = initializers.update_initializer(
+            BiasInitializer, bias_init, ("ConstantFill", {})
+        )
+        if not self.init_params:
+            WeightInitializer = initializers.ExternalInitializer()
+            BiasInitializer = initializers.ExternalInitializer()
+
+        weight = self.create_param(
+            param_name=blob_out + '_w',
+            shape=weight_shape,
+            initializer=WeightInitializer,
+            tags=ParameterTags.WEIGHT
+        )
+        if not no_bias:
+            bias = self.create_param(
+                param_name=blob_out + '_b',
+                shape=[dim_out, ],
+                initializer=BiasInitializer,
+                tags=ParameterTags.BIAS
+            )
+
+        if no_bias:
+            inputs = [blob_in, offset, weight]
+        else:
+            inputs = [blob_in, offset, weight, bias]
+        if isinstance(kernel, list):
+            return self.net.DeformConv(
+                inputs,
+                blob_out,
+                kernel_h=kernel[0],
+                kernel_w=kernel[1],
+                pad=pad,
+                stride=stride,
+                dilation=dilation,
+                order=order,
+                deformable_group=deformable_group,
+                use_cudnn=self.use_cudnn)
+        else:
+            return self.net.DeformConv(
+                inputs,
+                blob_out,
+                kernel=kernel,
+                pad=pad,
+                stride=stride,
+                dilation=dilation,
+                order=order,
+                deformable_group=deformable_group,
+                use_cudnn=self.use_cudnn)
 
     def DisableCudnn(self):
         self.prev_use_cudnn = self.use_cudnn
