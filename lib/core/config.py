@@ -967,7 +967,22 @@ __C.EXPECTED_RESULTS_EMAIL = b''
 # specified by DOWNLOAD_CACHE
 __C.DOWNLOAD_CACHE = b'/tmp/detectron-download-cache'
 
+__C.IMAGE = AttrDict()
 
+__C.IMAGE.aug = True
+__C.IMAGE.saturation_prob = 0.5
+__C.IMAGE.saturation_lower = 0.5
+__C.IMAGE.saturation_upper = 1.5
+__C.IMAGE.hue_prob = 0.5
+__C.IMAGE.hue_delta = 18
+__C.IMAGE.lighting_noise_prob = 0.5
+__C.IMAGE.contrast_prob = 0.5
+__C.IMAGE.contrast_lower = 0.5
+__C.IMAGE.contrast_upper = 1.5
+__C.IMAGE.brightness_prob = 0.5
+__C.IMAGE.brightness_delta = 32
+__C.IMAGE.rotate_prob = 0.5
+__C.IMAGE.rotate_delta = 15
 # ---------------------------------------------------------------------------- #
 # Cluster options
 # ---------------------------------------------------------------------------- #

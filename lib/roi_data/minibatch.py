@@ -67,22 +67,39 @@ def get_minibatch(roidb):
     # single tensor, hence we initialize each blob to an empty list
     blobs = {k: [] for k in get_minibatch_blob_names()}
     # Get the input image blob, formatted for caffe2
-    im_blob, im_scales = _get_image_blob(roidb)
+    # im_blob, im_scales = _get_image_blob(roidb)
+    # blobs['data'] = im_blob
+    # if cfg.RPN.RPN_ON:
+    #     # RPN-only or end-to-end Faster/Mask R-CNN
+    #     valid = roi_data.rpn.add_rpn_blobs(blobs, im_scales, roidb)
+    # elif cfg.RETINANET.RETINANET_ON:
+    #     im_width, im_height = im_blob.shape[3], im_blob.shape[2]
+    #     # im_width, im_height corresponds to the network input: padded image
+    #     # (if needed) width and height. We pass it as input and slice the data
+    #     # accordingly so that we don't need to use SampleAsOp
+    #     valid = roi_data.retinanet.add_retinanet_blobs(
+    #         blobs, im_scales, roidb, im_width, im_height
+    #     )
+    # else:
+    #     # Fast R-CNN like models trained on precomputed proposals
+    #     valid = roi_data.fast_rcnn.add_fast_rcnn_blobs(blobs, im_scales, roidb)
+
+    im_blob, im_scales, new_roidb = _get_image_aug_blob(roidb)
     blobs['data'] = im_blob
     if cfg.RPN.RPN_ON:
         # RPN-only or end-to-end Faster/Mask R-CNN
-        valid = roi_data.rpn.add_rpn_blobs(blobs, im_scales, roidb)
+        valid = roi_data.rpn.add_rpn_blobs(blobs, im_scales, new_roidb)
     elif cfg.RETINANET.RETINANET_ON:
         im_width, im_height = im_blob.shape[3], im_blob.shape[2]
         # im_width, im_height corresponds to the network input: padded image
         # (if needed) width and height. We pass it as input and slice the data
         # accordingly so that we don't need to use SampleAsOp
         valid = roi_data.retinanet.add_retinanet_blobs(
-            blobs, im_scales, roidb, im_width, im_height
+            blobs, im_scales, new_roidb, im_width, im_height
         )
     else:
         # Fast R-CNN like models trained on precomputed proposals
-        valid = roi_data.fast_rcnn.add_fast_rcnn_blobs(blobs, im_scales, roidb)
+        valid = roi_data.fast_rcnn.add_fast_rcnn_blobs(blobs, im_scales, new_roidb)
     return blobs, valid
 
 
@@ -112,3 +129,181 @@ def _get_image_blob(roidb):
     blob = blob_utils.im_list_to_blob(processed_ims)
 
     return blob, im_scales
+
+def _get_image_aug_blob(roidb):
+    """Builds an input blob from the images in the roidb at the specified
+    scales.
+    """
+    num_images = len(roidb)
+    # Sample random scales to use for each image in this batch
+    scale_inds = np.random.randint(
+        0, high=len(cfg.TRAIN.SCALES), size=num_images
+    )
+    processed_ims = []
+    im_scales = []
+    for i in range(num_images):
+        im = cv2.imread(roidb[i]['image'])
+        if roidb[i]['flipped']:
+            im = im[:, ::-1, :]
+
+        im = im.astype(np.float)
+        
+        new_rec = roi_rec.copy()
+        boxes = roi_rec['boxes'].copy()
+        polygons = roi_rec['polygons'].copy()
+        charboxes = roi_rec['charboxes'].copy()
+
+        if cfg.TRAIN.aug:
+            im, boxes, polygons, charboxes = _rotate_image(im, boxes, polygons, charboxes)
+            im = _random_saturation(im)
+            im = _random_hue(im)
+            im = _random_lighting_noise(im)
+            im = _random_contrast(im)
+            im = _random_brightness(im)
+
+        # scale_ind = random.randrange(len(config.SCALES))
+        # target_size = config.SCALES[scale_ind][0]
+        # max_size = config.SCALES[scale_ind][1]
+        # im, im_scale = resize(im, target_size, max_size, stride=config.network.IMAGE_STRIDE)
+        # im_tensor = transform(im, config.network.PIXEL_MEANS)
+        # processed_ims.append(im_tensor)
+        target_size = cfg.TRAIN.SCALES[scale_inds[i]]
+        im, im_scale = blob_utils.prep_im_for_blob(
+            im, cfg.PIXEL_MEANS, [target_size], cfg.TRAIN.MAX_SIZE
+        )
+        im=im[0]
+        im_scale=im_scale[0]
+        processed_ims.append(im)
+
+        
+        im_info = [im.shape[2], im.shape[3], im_scale]
+        new_rec['boxes'] = clip_boxes(np.round(boxes.copy() * im_scale), im_info[:2])
+        new_rec['polygons'] = clip_polygons(np.round(polygons.copy() * im_scale), im_info[:2])
+        new_rec['charboxes'] = resize_clip_char_boxes(charboxes.copy(), im_scale, im_info[:2])
+        new_rec['im_info'] = im_info
+        processed_roidb.append(new_rec)
+        im_scales.append(1.0)
+
+    # Create a blob to hold the input images
+    blob = blob_utils.im_list_to_blob(processed_ims)
+
+    return blob, im_scales, processed_roidb
+
+def _rotate_image(im, boxes, polygons, charboxes):
+    if cfg.IMAGE: 
+        delta = cfg.IMAGE.rotate_delta
+        prob = cfg.IMAGE.rotate_prob
+    else:
+        delta = 10
+        prob = 1
+    new_boxes = boxes.copy()
+    new_polygons = polygons.copy()
+    new_charboxes = charboxes.copy()
+    if random.random() < prob:
+        delta = random.uniform(-1*delta, delta)
+        ## rotate image first
+        height, width, _ = im.shape
+        ## get the minimal rect to cover the rotated image
+        img_box = np.array([[0, 0, width, 0, width, height, 0, height]])
+        rotated_img_box = quad2minrect(rotate_polygons(img_box, -1*delta, (width/2, height/2)))
+        r_height = int(max(rotated_img_box[0][3], rotated_img_box[0][1]) - min(rotated_img_box[0][3], rotated_img_box[0][1]))
+        r_width = int(max(rotated_img_box[0][2], rotated_img_box[0][0]) - min(rotated_img_box[0][2], rotated_img_box[0][0]))
+
+        ## padding im
+        im_padding = np.zeros((r_height, r_width, 3))
+        start_h, start_w = int((r_height - height)/2.0), int((r_width - width)/2.0)
+        end_h, end_w = start_h + height, start_w + width
+        im_padding[start_h:end_h, start_w:end_w, :] = im
+        ## get new boxes, polygons, charboxes
+        boxes[:, :-1:2] += start_w
+        boxes[:, 1:-1:2] += start_h
+        polygons[:, ::2] += start_w
+        polygons[:, 1::2] += start_h
+        charboxes[:, :8:2] += start_w
+        charboxes[:, 1:8:2] += start_h
+
+        M = cv2.getRotationMatrix2D((r_width/2, r_height/2), delta, 1)
+        im = cv2.warpAffine(im_padding, M, (r_width, r_height))
+
+        ## get new boxes
+        ## gt
+        new_boxes[:, :4] = quad2minrect(rotate_polygons(rect2quad(boxes), -1*delta, (r_width/2, r_height/2)))
+        ## polygons
+        new_polygons = rotate_polygons(polygons, -1*delta, (r_width/2, r_height/2))
+        ## charboxes
+        if charboxes[:, -1].mean() != -1:
+            new_charboxes[:, :8] = rotate_polygons(charboxes[:, :8], -1*delta, (r_width/2, r_height/2))
+    return im, new_boxes, new_polygons, new_charboxes
+
+def _random_saturation(im):
+    if cfg.IMAGE:
+        prob = cfg.IMAGE.saturation_prob
+        lower = cfg.IMAGE.saturation_lower
+        upper = cfg.IMAGE.saturation_upper
+    else:
+        prob = 0.5
+        lower = 0.5
+        upper = 1.5
+
+    assert upper >= lower, "saturation upper must be >= lower."
+    assert lower >= 0, "saturation lower must be non-negative."
+    if random.random() < prob:
+        im[:, :, 1] *= random.uniform(lower, upper)
+    return im
+
+def _random_hue(im):
+    if cfg.IMAGE:
+        prob = cfg.IMAGE.hue_prob
+        delta = cfg.IMAGE.hue_delta
+    else:
+        prob = 0.5
+        delta = 18
+    if random.random() < prob:
+        im[:, :, 0] += random.uniform(delta, delta)
+        im[:, :, 0][im[:, :, 0] > 360.0] -= 360.0
+        im[:, :, 0][im[:, :, 0] < 0.0] += 360.0
+    return im
+
+def _random_lighting_noise(im):
+    if cfg.IMAGE:
+        prob = cfg.IMAGE.lighting_noise_prob
+    else:
+        prob = 0.5
+    perms = ((0, 1, 2), (0, 2, 1),
+            (1, 0, 2), (1, 2, 0),
+            (2, 0, 1), (2, 1, 0))
+
+    if random.random() < prob:
+        swap = perms[random.randint(0, len(perms) - 1)]
+        im = im[:, :, swap]
+    return im
+
+def _random_contrast(im):
+    if cfg.IMAGE:
+        prob = cfg.IMAGE.contrast_prob
+        lower = cfg.IMAGE.contrast_lower
+        upper = cfg.IMAGE.contrast_upper
+    else:
+        prob = 0.5
+        lower = 0.5
+        upper = 1.5
+    assert upper >= lower, "contrast upper must be >= lower."
+    assert lower >= 0, "contrast lower must be non-negative."
+    if random.random() < prob:
+        alpha = random.uniform(lower, upper)
+        im *= alpha
+    return im
+
+    
+
+def _random_brightness(im):
+    if cfg.IMAGE:
+        delta = cfg.IMAGE.brightness_delta
+        prob = cfg.IMAGE.brightness_prob
+    else:
+        delta = 32
+        prob = 0.5
+    if random.random() < prob:
+        delta = random.uniform(-1*delta, delta)
+        im += delta
+    return im

@@ -61,3 +61,18 @@ TEST:
   RPN_POST_NMS_TOP_N: 1000
   VIS: False
 OUTPUT_DIR: .
+IMAGE:
+  aug: true
+  saturation_prob: 0.5
+  saturation_lower: 0.5
+  saturation_upper: 1.5
+  hue_prob: 0.5
+  hue_delta: 18
+  lighting_noise_prob: 0.5
+  contrast_prob: 0.5
+  contrast_lower: 0.5
+  contrast_upper: 1.5
+  brightness_prob: 0.5
+  brightness_delta: 32
+  rotate_prob: 0.5
+  rotate_delta: 15
