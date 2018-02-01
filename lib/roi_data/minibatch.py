@@ -38,6 +38,12 @@ import roi_data.retinanet
 import roi_data.rpn
 import utils.blob as blob_utils
 
+import random
+from shapely.geometry import box, Polygon 
+from shapely import affinity
+import math
+from PIL import Image, ImageDraw
+
 logger = logging.getLogger(__name__)
 
 
@@ -83,7 +89,7 @@ def get_minibatch(roidb):
             )
         else:
             # Fast R-CNN like models trained on precomputed proposals
-            valid = roi_data.fast_rcnn.add_fast_rcnn_blobs(blobs, im_scales, roidb)
+            valid = roi_data.fast_rcnn.add_fast_rcnn_blobs_rec(blobs, im_scales, roidb)
     else:
         im_blob, im_scales, new_roidb = _get_image_aug_blob(roidb)
         blobs['data'] = im_blob
@@ -100,7 +106,7 @@ def get_minibatch(roidb):
             )
         else:
             # Fast R-CNN like models trained on precomputed proposals
-            valid = roi_data.fast_rcnn.add_fast_rcnn_blobs(blobs, im_scales, new_roidb)
+            valid = roi_data.fast_rcnn.add_fast_rcnn_blobs_rec(blobs, im_scales, new_roidb)
     return blobs, valid
 
 
@@ -142,7 +148,9 @@ def _get_image_aug_blob(roidb):
     )
     processed_ims = []
     im_scales = []
+    processed_roidb = []
     for i in range(num_images):
+        roi_rec = roidb[i]
         im = cv2.imread(roidb[i]['image'])
         if roidb[i]['flipped']:
             im = im[:, ::-1, :]
@@ -154,7 +162,7 @@ def _get_image_aug_blob(roidb):
         polygons = roi_rec['polygons'].copy()
         charboxes = roi_rec['charboxes'].copy()
 
-        if cfg.TRAIN.aug:
+        if cfg.IMAGE.aug:
             im, boxes, polygons, charboxes = _rotate_image(im, boxes, polygons, charboxes)
             im = _random_saturation(im)
             im = _random_hue(im)
@@ -175,20 +183,64 @@ def _get_image_aug_blob(roidb):
         im=im[0]
         im_scale=im_scale[0]
         processed_ims.append(im)
-
-        
-        im_info = [im.shape[2], im.shape[3], im_scale]
-        new_rec['boxes'] = clip_boxes(np.round(boxes.copy() * im_scale), im_info[:2])
-        new_rec['polygons'] = clip_polygons(np.round(polygons.copy() * im_scale), im_info[:2])
-        new_rec['charboxes'] = resize_clip_char_boxes(charboxes.copy(), im_scale, im_info[:2])
+        im_info = [im.shape[0], im.shape[1], im_scale]
+        new_rec['boxes'] = _clip_boxes(np.round(boxes.copy() * im_scale), im_info[:2])
+        new_rec['polygons'] = _clip_polygons(np.round(polygons.copy() * im_scale), im_info[:2])
+        new_rec['charboxes'] = _resize_clip_char_boxes(charboxes.copy(), im_scale, im_info[:2])
         new_rec['im_info'] = im_info
         processed_roidb.append(new_rec)
         im_scales.append(1.0)
+
+        # _visualize_roidb(im, new_rec['boxes'], new_rec['polygons'], new_rec['charboxes'])
 
     # Create a blob to hold the input images
     blob = blob_utils.im_list_to_blob(processed_ims)
 
     return blob, im_scales, processed_roidb
+
+def _clip_boxes(boxes, im_shape):
+    """
+    Clip boxes to image boundaries.
+    :param boxes: [N, 4* num_classes]
+    :param im_shape: tuple of 2
+    :return: [N, 4* num_classes]
+    """
+    # x1 >= 0
+    boxes[:, 0::4] = np.maximum(np.minimum(boxes[:, 0::4], im_shape[1] - 1), 0)
+    # y1 >= 0
+    boxes[:, 1::4] = np.maximum(np.minimum(boxes[:, 1::4], im_shape[0] - 1), 0)
+    # x2 < im_shape[1]
+    boxes[:, 2::4] = np.maximum(np.minimum(boxes[:, 2::4], im_shape[1] - 1), 0)
+    # y2 < im_shape[0]
+    boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], im_shape[0] - 1), 0)
+    return boxes
+
+def _clip_polygons(polygons, im_shape):
+    """
+    Clip polygons to image boundaries.
+    :param polygons: [N, 4* num_classes]
+    :param im_shape: tuple of 2
+    :return: [N, 4* num_classes]
+    """
+    # x1 >= 0
+    polygons[:, 0:8:2] = np.maximum(np.minimum(polygons[:, 0:8:2], im_shape[1] - 1), 0)
+    # y1 >= 0
+    polygons[:, 1:8:2] = np.maximum(np.minimum(polygons[:, 1:8:2], im_shape[0] - 1), 0)
+    return polygons
+
+def _resize_clip_char_boxes(polygons, im_scale, im_shape):
+    """
+    Clip polygons to image boundaries.
+    :param polygons: [N, 4* num_classes]
+    :param im_shape: tuple of 2
+    :return: [N, 4* num_classes]
+    """
+    # x1 >= 0
+    polygons[:, :8] = np.round(polygons[:, :8]*im_scale)
+    polygons[:, 0:8:2] = np.maximum(np.minimum(polygons[:, 0:8:2], im_shape[1] - 1), 0)
+    # y1 >= 0
+    polygons[:, 1:8:2] = np.maximum(np.minimum(polygons[:, 1:8:2], im_shape[0] - 1), 0)
+    return polygons
 
 def _rotate_image(im, boxes, polygons, charboxes):
     if cfg.IMAGE: 
@@ -206,7 +258,7 @@ def _rotate_image(im, boxes, polygons, charboxes):
         height, width, _ = im.shape
         ## get the minimal rect to cover the rotated image
         img_box = np.array([[0, 0, width, 0, width, height, 0, height]])
-        rotated_img_box = quad2minrect(rotate_polygons(img_box, -1*delta, (width/2, height/2)))
+        rotated_img_box = _quad2minrect(_rotate_polygons(img_box, -1*delta, (width/2, height/2)))
         r_height = int(max(rotated_img_box[0][3], rotated_img_box[0][1]) - min(rotated_img_box[0][3], rotated_img_box[0][1]))
         r_width = int(max(rotated_img_box[0][2], rotated_img_box[0][0]) - min(rotated_img_box[0][2], rotated_img_box[0][0]))
 
@@ -216,8 +268,8 @@ def _rotate_image(im, boxes, polygons, charboxes):
         end_h, end_w = start_h + height, start_w + width
         im_padding[start_h:end_h, start_w:end_w, :] = im
         ## get new boxes, polygons, charboxes
-        boxes[:, :-1:2] += start_w
-        boxes[:, 1:-1:2] += start_h
+        boxes[:, 0::2] += start_w
+        boxes[:, 1::2] += start_h
         polygons[:, ::2] += start_w
         polygons[:, 1::2] += start_h
         charboxes[:, :8:2] += start_w
@@ -228,13 +280,32 @@ def _rotate_image(im, boxes, polygons, charboxes):
 
         ## get new boxes
         ## gt
-        new_boxes[:, :4] = quad2minrect(rotate_polygons(rect2quad(boxes), -1*delta, (r_width/2, r_height/2)))
+        new_boxes[:, :4] = _quad2minrect(_rotate_polygons(_rect2quad(boxes), -1*delta, (r_width/2, r_height/2)))
         ## polygons
-        new_polygons = rotate_polygons(polygons, -1*delta, (r_width/2, r_height/2))
+        new_polygons = _rotate_polygons(polygons, -1*delta, (r_width/2, r_height/2))
         ## charboxes
         if charboxes[:, -1].mean() != -1:
-            new_charboxes[:, :8] = rotate_polygons(charboxes[:, :8], -1*delta, (r_width/2, r_height/2))
+            new_charboxes[:, :8] = _rotate_polygons(charboxes[:, :8], -1*delta, (r_width/2, r_height/2))
     return im, new_boxes, new_polygons, new_charboxes
+
+def _rotate_polygons(polygons, angle, r_c):
+    ## polygons: N*8
+    ## r_x: rotate center x
+    ## r_y: rotate center y
+    ## angle: -15~15
+
+    poly_list = _quad2boxlist(polygons)
+    rotate_boxes_list = []
+    for poly in poly_list:
+        box = Polygon(poly)
+        rbox = affinity.rotate(box, angle, r_c)
+        if len(list(rbox.exterior.coords))<5:
+            print(poly)
+            print(rbox)
+        # assert(len(list(rbox.exterior.coords))>=5)
+        rotate_boxes_list.append(rbox.boundary.coords[:-1])
+    res = _boxlist2quads(rotate_boxes_list)
+    return res
 
 def _random_saturation(im):
     if cfg.IMAGE:
@@ -308,3 +379,55 @@ def _random_brightness(im):
         delta = random.uniform(-1*delta, delta)
         im += delta
     return im
+
+def _rect2quad(boxes):
+    x_min, y_min, x_max, y_max = boxes[:, 0].reshape((-1, 1)), boxes[:, 1].reshape((-1, 1)), boxes[:, 2].reshape((-1, 1)), boxes[:, 3].reshape((-1, 1))
+    return np.hstack((x_min, y_min, x_max, y_min, x_max, y_max, x_min, y_max))
+
+def _quad2rect(boxes):
+    ## only support rectangle
+    return np.hstack((boxes[:, 0].reshape((-1, 1)), boxes[:, 1].reshape((-1, 1)), boxes[:, 4].reshape((-1, 1)), boxes[:, 5].reshape((-1, 1))))
+
+def _quad2minrect(boxes):
+    ## trans a quad(N*4) to a rectangle(N*4) which has miniual area to cover it
+    return np.hstack((boxes[:, ::2].min(axis=1).reshape((-1, 1)), boxes[:, 1::2].min(axis=1).reshape((-1, 1)), boxes[:, ::2].max(axis=1).reshape((-1, 1)), boxes[:, 1::2].max(axis=1).reshape((-1, 1))))
+
+
+def _quad2boxlist(boxes):
+    res = []
+    for i in range(boxes.shape[0]):
+        res.append([[boxes[i][0], boxes[i][1]], [boxes[i][2], boxes[i][3]], [boxes[i][4], boxes[i][5]], [boxes[i][6], boxes[i][7]]])
+    return res
+
+def _boxlist2quads(boxlist):
+    res = np.zeros((len(boxlist), 8))
+    for i, box in enumerate(boxlist):
+        # print(box)
+        res[i] = np.array([box[0][0], box[0][1], box[1][0], box[1][1], box[2][0], box[2][1], box[3][0], box[3][1]])
+    return res
+
+def _visualize_roidb(im, boxes, polygons, charboxes):
+    lex = '_0123456789abcdefghijklmnopqrstuvwxyz'
+    img = np.array(im, dtype=np.uint8)
+    img = Image.fromarray(img)
+    img_draw = ImageDraw.Draw(img)
+    for i in range(boxes.shape[0]):
+        color = _random_color()
+        img_draw.rectangle(list(boxes[i][:4]), outline=color)
+        img_draw.polygon(list(polygons[i]), outline=color)
+        choose_cboxes = charboxes[np.where(charboxes[:, -1] == i)[0], :]
+        for j in range(choose_cboxes.shape[0]):
+            img_draw.polygon(list(choose_cboxes[j][:8]), outline=color)
+            char = lex[int(choose_cboxes[j][8])]
+            img_draw.text(list(choose_cboxes[j][:2]), char)
+
+    img.save('./tests/visu/' + 'demo.jpg')
+    print('image saved')
+    raw_input()
+
+def _random_color():
+    r = random.randint(0, 255)
+    g = random.randint(0, 255)
+    b = random.randint(0, 255)
+
+    return (r, g, b)
