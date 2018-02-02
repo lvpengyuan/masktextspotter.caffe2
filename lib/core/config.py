@@ -451,6 +451,8 @@ __C.MODEL = AttrDict()
 # (e.g., 'generalized_rcnn', 'mask_rcnn', ...)
 __C.MODEL.TYPE = b''
 
+__C.MODEL.NAME = b''
+
 # The backbone conv body to use
 # The string must match a function that is imported in modeling.model_builder
 # (e.g., 'FPN.add_fpn_ResNet101_conv5_body' to specify a ResNet-101-FPN
@@ -1073,7 +1075,7 @@ def get_output_dir(training=True):
     dataset = ':'.join(dataset)
     tag = 'train' if training else 'test'
     # <output-dir>/<train|test>/<dataset>/<model-type>/
-    outdir = osp.join(__C.OUTPUT_DIR, tag, dataset, __C.MODEL.TYPE)
+    outdir = osp.join(__C.OUTPUT_DIR, tag, dataset, __C.MODEL.TYPE, __C.MODEL.NAME)
     if not osp.exists(outdir):
         os.makedirs(outdir)
     return outdir
