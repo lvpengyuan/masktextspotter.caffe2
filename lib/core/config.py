@@ -188,6 +188,12 @@ __C.TRAIN.FREEZE_CONV_BODY = False
 # output directory
 __C.TRAIN.AUTO_RESUME = True
 
+##############################   Ours new cfgs #################################
+__C.TRAIN.MIX_TRAIN = False
+__C.TRAIN.MIX_RATIOS = [0.5, 0.25, 0.25] 
+__C.TRAIN.USE_CHARANNS = [True, False, False]
+################################################################################
+
 
 # ---------------------------------------------------------------------------- #
 # Data loader options

@@ -57,7 +57,7 @@ class TextDataSet(object):
         self.num_images = len(self.image_set_index)
         self.char_classes = '_0123456789abcdefghijklmnopqrstuvwxyz'
 
-    def get_roidb(self, gt=None, proposal_file=None, min_proposal_size=2, proposal_limit=-1, crowd_filter_thresh=0):
+    def get_roidb(self, gt=None, proposal_file=None, use_charann=True, min_proposal_size=2, proposal_limit=-1, crowd_filter_thresh=0):
         """Return an roidb corresponding to the dataset. Optionally:
            - include ground truth boxes in the roidb
            - add proposals specified in a proposals file
@@ -68,6 +68,7 @@ class TextDataSet(object):
         assert proposal_file is None, 'Only gt_roidb is supported Now!!!'
         self.min_proposal_size = min_proposal_size
         self.keypoints = None
+        self.use_charann = use_charann
         self.debug_timer.tic()
         roidb = self.gt_roidb()
         logger.debug(
@@ -90,7 +91,10 @@ class TextDataSet(object):
 
     def gt_roidb(self):
         if self.set == 'train':
-            cache_file = os.path.join(_CACHE_DIR, self.name + '_gt_roidb.pkl')
+            if self.use_charann == False:
+                cache_file = os.path.join(_CACHE_DIR, self.name + '_gt_roidb_wocharann.pkl')
+            else:
+                cache_file = os.path.join(_CACHE_DIR, self.name + '_gt_roidb.pkl')
         else:
             cache_file = os.path.join(_CACHE_DIR, self.name + '_val_roidb.pkl')
         if os.path.exists(cache_file):
@@ -191,7 +195,12 @@ class TextDataSet(object):
                     charboxes.append(charbbs)
                     words.append(strs)
         if len(boxes) > 0:
-            return words, np.array(boxes), np.array(polygons), np.vstack(charboxes), np.array(seg_areas), segmentations
+            if self.use_charann:
+                return words, np.array(boxes), np.array(polygons), np.vstack(charboxes), np.array(seg_areas), segmentations
+            else:
+                charbbs = np.zeros((1, 10), dtype=np.float32)
+                charbbs.fill(-1) 
+                return words, np.array(boxes), np.array(polygons), charbbs, np.array(seg_areas), segmentations
         else:
             return [], np.zeros((0, 4), dtype=np.float32), np.zeros((0, 8), dtype=np.float32), np.zeros((0, 10), dtype=np.float32), np.zeros((0), dtype=np.float32), []
 

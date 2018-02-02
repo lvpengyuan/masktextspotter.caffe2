@@ -72,6 +72,53 @@ def combined_roidb_for_training(dataset_names, proposal_files):
 
     return roidb
 
+
+def mix_roidbs_for_training(dataset_names, proposal_files, use_charanns):
+    """Load and concatenate roidbs for one or more datasets, along with optional
+    object proposals. The roidb entries are then prepared for use in training,
+    which involves caching certain types of metadata for each roidb entry.
+    """
+    def get_roidb(dataset_name, proposal_file, use_charann):
+        ds = TextDataSet(dataset_name)
+        roidb = ds.get_roidb(
+            gt=True,
+            proposal_file=proposal_file,
+            use_charann=use_charann,
+            crowd_filter_thresh=cfg.TRAIN.CROWD_FILTER_THRESH
+        )
+        if cfg.TRAIN.USE_FLIPPED:
+            logger.info('Appending horizontally-flipped training examples...')
+            extend_with_flipped_entries(roidb, ds)
+        logger.info('Loaded dataset: {:s}'.format(ds.name))
+        return roidb
+
+    if isinstance(dataset_names, basestring):
+        dataset_names = (dataset_names, )
+    if isinstance(proposal_files, basestring):
+        proposal_files = (proposal_files, )
+    if len(proposal_files) == 0:
+        proposal_files = (None, ) * len(dataset_names)
+    assert len(dataset_names) == len(proposal_files)
+    assert len(dataset_names) == len(use_charanns)
+    roidbs = [get_roidb(*args) for args in zip(dataset_names, proposal_files, use_charanns)]
+    # roidb = roidbs[0]
+    # for r in roidbs[1:]:
+    #     roidb.extend(r)
+    # roidb = filter_for_training(roidb)
+
+    # logger.info('Computing bounding-box regression targets...')
+    # add_bbox_regression_targets(roidb)
+    # logger.info('done')
+
+    # _compute_and_log_stats(roidb)
+
+    roidbs = [filter_for_training(roidb) for roidb in roidbs]
+    for roidb in roidbs:
+        add_bbox_regression_targets(roidb)
+        _compute_and_log_stats(roidb)
+
+    return roidbs
+
 def flip_polygons(polygons, width):
     if polygons is not None:
         oldx1 = polygons[:, 0].copy()

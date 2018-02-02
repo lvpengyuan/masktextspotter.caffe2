@@ -4,12 +4,12 @@ MODEL:
   NUM_CLASSES: 2
   FASTER_RCNN: True
   MASK_ON: True
-NUM_GPUS: 2
+NUM_GPUS: 4
 SOLVER:
   WEIGHT_DECAY: 0.0001
   LR_POLICY: steps_with_decay
-  # BASE_LR: 0.0001  #icdar13 
-  BASE_LR: 0.005   #synth
+  BASE_LR: 0.0001  #icdar13 
+  # BASE_LR: 0.005   #synth
   GAMMA: 0.1
   MAX_ITER: 200000
   STEPS: [0, 120000, 160000]
@@ -18,6 +18,7 @@ FPN:
   MULTILEVEL_ROIS: True
   MULTILEVEL_RPN: True
   USE_DEFORMABLE: True
+  RPN_ASPECT_RATIOS: (0.25, 0.5, 1, 2, 4)
 FAST_RCNN:
   ROI_BOX_HEAD: fast_rcnn_heads.add_roi_2mlp_head
   ROI_XFORM_METHOD: RoIAlign
@@ -39,18 +40,44 @@ MRCNN:
   MASK_BATCH_SIZE_PER_IM: 16
   WEIGHT_LOSS_MASK: 1.0
 TRAIN:
-  WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
-  # WEIGHTS: ./train/synth_train/generalized_rcnn/model_final.pkl
-  # DATASETS: ('icdar2013_train', 'icdar2015_train')
-  DATASETS: ('icdar2013_train', )
-  # DATASETS: ('synth_train', )
-  SCALES: (800,)
-  MAX_SIZE: 1333
   BATCH_SIZE_PER_IM: 512
   RPN_PRE_NMS_TOP_N: 2000  # Per FPN level
   AUTO_RESUME: True
   SNAPSHOT_ITERS: 20000
+
+  ##################### pre-train on synth ##########################
+  # WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
+  # DATASETS: ('icdar2013_train', )
+  # SCALES: (800,)
+  # MAX_SIZE: 1333
+  # IMS_PER_BATCH: 2
+  # ASPECT_GROUPING: True
+  # MIX_TRAIN: False
+  ######################  Fine tune   #################################
+  MIX_TRAIN: True
+  WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
+
+
+  DATASETS: ('synth_train', 'icdar2013_train', 'icdar2015_train')
+  USE_CHARANNS: [True, False, False]
+  ## the ratios of synth, icdar2013, icdar2015 is 2:1:1, defaultly
+  MIX_RATIOS: [0.5, 0.25, 0.25]
+
+  ## icdar13 && icdar15 are used for debug
+  # DATASETS: ('icdar2013_train', 'icdar2015_train')
+  # USE_CHARANNS: [True, False]
+  # MIX_RATIOS: [0.5, 0.5]
+  # the ratios of synth, icdar2013, icdar2015 is 2:1:1, defaultly
+
+
+  SCALES: (600, 800, 1000, 1200)
+  MAX_SIZE: 1666
   IMS_PER_BATCH: 1
+  ASPECT_GROUPING: False
+
+
+
+
 IMAGE:
   aug: False
   saturation_prob: 0.5
