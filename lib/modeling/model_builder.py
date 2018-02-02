@@ -45,6 +45,7 @@ from caffe2.python import workspace
 from core.config import cfg
 from modeling.detector import DetectionModelHelper
 from roi_data.loader import RoIDataLoader
+from roi_data.mix_loader import MixRoIDataLoader
 import modeling.fast_rcnn_heads as fast_rcnn_heads
 import modeling.keypoint_rcnn_heads as keypoint_rcnn_heads
 # import modeling.mask_rcnn_heads as mask_rcnn_heads
@@ -371,11 +372,19 @@ def add_training_inputs(model, roidb=None):
     #   Since we defer input op creation, we need to do a little bit of surgery
     #   to place the input ops at the start of the network op list.
     assert model.train, 'Training inputs can only be added to a trainable model'
-    if roidb is not None:
-        # To make debugging easier you can set cfg.DATA_LOADER.NUM_THREADS = 1
-        model.roi_data_loader = RoIDataLoader(
-            roidb, num_loaders=cfg.DATA_LOADER.NUM_THREADS
-        )
+    if not cfg.TRAIN.MIX_TRAIN:
+        if roidb is not None:
+            # To make debugging easier you can set cfg.DATA_LOADER.NUM_THREADS = 1
+            model.roi_data_loader = RoIDataLoader(
+                roidb, num_loaders=cfg.DATA_LOADER.NUM_THREADS
+            )
+        
+    else:
+        assert roidb, 'roidb is None.....'
+        assert isinstance(roidb, list)
+        model.roi_data_loader = MixRoIDataLoader(
+                roidb, num_loaders=cfg.DATA_LOADER.NUM_THREADS
+            )
     orig_num_op = len(model.net._net.op)
     blob_names = roi_data.minibatch.get_minibatch_blob_names(
         is_training=True
@@ -392,6 +401,7 @@ def add_training_inputs(model, roidb=None):
     new_op = model.net._net.op[-diff:] + model.net._net.op[:-diff]
     del model.net._net.op[:]
     model.net._net.op.extend(new_op)
+
 
 
 def add_inference_inputs(model):

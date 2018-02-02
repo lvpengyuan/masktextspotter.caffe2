@@ -25,7 +25,7 @@ from core.config import cfg
 from core.config import get_output_dir
 from core.config import merge_cfg_from_file
 from core.config import merge_cfg_from_list
-from datasets.roidb_text import combined_roidb_for_training
+from datasets.roidb_text import combined_roidb_for_training, mix_roidbs_for_training
 from modeling import model_builder
 from utils.logging import log_json_stats
 from utils.logging import setup_logging
@@ -103,11 +103,20 @@ def vis_roidb(roidb):
 
 def main(opts):
     logger = logging.getLogger(__name__)
-    roidb = combined_roidb_for_training(
-        cfg.TRAIN.DATASETS, cfg.TRAIN.PROPOSAL_FILES)
-    for i in range(50):
-    	entry = roidb[random.randint(0, len(roidb))]
-    	vis_roidb(entry)
+    ## test combined_roidb_for_training
+    # roidb = combined_roidb_for_training(
+    #     cfg.TRAIN.DATASETS, cfg.TRAIN.PROPOSAL_FILES)
+    # for i in range(50):
+    # 	entry = roidb[random.randint(0, len(roidb))]
+    # 	vis_roidb(entry)
+    ## test
+    roidbs = mix_roidbs_for_training(
+        cfg.TRAIN.DATASETS, cfg.TRAIN.PROPOSAL_FILES, cfg.TRAIN.USE_CHARANNS)
+    for roibd in roidbs:
+        for i in range(50):
+            entry = roibd[random.randint(0, len(roibd))]
+            vis_roidb(entry)
+        raw_input()
 
 
 

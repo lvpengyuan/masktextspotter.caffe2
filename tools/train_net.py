@@ -42,7 +42,7 @@ from core.config import cfg
 from core.config import get_output_dir
 from core.config import merge_cfg_from_file
 from core.config import merge_cfg_from_list
-from datasets.roidb_text import combined_roidb_for_training
+from datasets.roidb_text import combined_roidb_for_training, mix_roidbs_for_training
 from modeling import model_builder
 from utils.logging import log_json_stats
 from utils.logging import setup_logging, setup_logger
@@ -329,11 +329,21 @@ def add_model_training_inputs(model):
     """Load the training dataset and attach the training inputs to the model."""
     logger = logging.getLogger(__name__)
     logger.info('Loading dataset: {}'.format(cfg.TRAIN.DATASETS))
-    roidb = combined_roidb_for_training(
-        cfg.TRAIN.DATASETS, cfg.TRAIN.PROPOSAL_FILES
-    )
-    logger.info('{:d} roidb entries'.format(len(roidb)))
-    model_builder.add_training_inputs(model, roidb=roidb)
+    if not cfg.TRAIN.MIX_TRAIN:
+        roidb = combined_roidb_for_training(
+            cfg.TRAIN.DATASETS, cfg.TRAIN.PROPOSAL_FILES
+        )
+        logger.info('{:d} roidb entries'.format(len(roidb)))
+        model_builder.add_training_inputs(model, roidb=roidb)
+    else:
+        roidbs = mix_roidbs_for_training(
+            cfg.TRAIN.DATASETS, cfg.TRAIN.PROPOSAL_FILES, cfg.TRAIN.USE_CHARANNS
+        )
+        for roidb in roidbs:
+            logger.info('{:d} roidb entries'.format(len(roidb)))
+        model_builder.add_training_inputs(model, roidb=roidbs)
+
+
 
 
 def dump_proto_files(model, output_dir):
