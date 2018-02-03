@@ -73,10 +73,10 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
     model_path = cfg.TEST.WEIGHTS
     model_name = model_path.split('/')[-1]
     model_dir = model_path[0:len(model_path)-len(model_name)]
-    save_dir_res = os.path.join(model_dir, model_name+'_results')
+    save_dir_res = os.path.join(model_dir, cfg.TEST.DATASETS[0], model_name+'_results')
     
     if not os.path.isdir(save_dir_res):
-        os.mkdir(save_dir_res)
+        os.makedirs(save_dir_res)
     if cfg.MODEL.MASK_ON and boxes.shape[0] > 0:
         timers['im_detect_mask'].tic()
         if cfg.TEST.MASK_AUG.ENABLED:

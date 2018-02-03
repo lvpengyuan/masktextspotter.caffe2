@@ -137,6 +137,8 @@ class MixRoIDataLoader(object):
             db_inds, dataset_ind = self._get_next_minibatch_inds()
             minibatch_db = [self._roidbs[dataset_ind][i] for i in db_inds]
             blobs, valid = get_minibatch(minibatch_db)
+            # for index, i in enumerate(db_inds):
+            #     self._roidbs[dataset_ind][i] = new_roidb[index]
         return blobs
 
     def _get_dataset_inds(self):

@@ -264,7 +264,7 @@ __C.TEST.DETECTIONS_PER_IM = 100
 # Minimum score threshold (assuming scores in a [0, 1] range); a value chosen to
 # balance obtaining high recall with not having too many low precision
 # detections that will slow down inference post processing steps (like NMS)
-__C.TEST.SCORE_THRESH = 0.05
+__C.TEST.SCORE_THRESH = 0.2
 
 # Save detection results files if True
 # If false, results files are cleaned up (they can be large) after local

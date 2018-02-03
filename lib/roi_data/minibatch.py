@@ -90,6 +90,7 @@ def get_minibatch(roidb):
         else:
             # Fast R-CNN like models trained on precomputed proposals
             valid = roi_data.fast_rcnn.add_fast_rcnn_blobs_rec(blobs, im_scales, roidb)
+        return blobs, valid
     else:
         im_blob, im_scales, new_roidb = _get_image_aug_blob(roidb)
         blobs['data'] = im_blob
@@ -107,7 +108,7 @@ def get_minibatch(roidb):
         else:
             # Fast R-CNN like models trained on precomputed proposals
             valid = roi_data.fast_rcnn.add_fast_rcnn_blobs_rec(blobs, im_scales, new_roidb)
-    return blobs, valid
+        return blobs, valid
 
 
 def _get_image_blob(roidb):
@@ -151,6 +152,7 @@ def _get_image_aug_blob(roidb):
     processed_roidb = []
     for i in range(num_images):
         roi_rec = roidb[i]
+        # name = roidb[i]['image'].split('/')[-1]
         im = cv2.imread(roidb[i]['image'])
         if roidb[i]['flipped']:
             im = im[:, ::-1, :]
@@ -161,6 +163,7 @@ def _get_image_aug_blob(roidb):
         boxes = roi_rec['boxes'].copy()
         polygons = roi_rec['polygons'].copy()
         charboxes = roi_rec['charboxes'].copy()
+        segms = roi_rec['segms']
 
         if cfg.IMAGE.aug:
             im, boxes, polygons, charboxes = _rotate_image(im, boxes, polygons, charboxes)
@@ -170,12 +173,8 @@ def _get_image_aug_blob(roidb):
             im = _random_contrast(im)
             im = _random_brightness(im)
 
-        # scale_ind = random.randrange(len(config.SCALES))
-        # target_size = config.SCALES[scale_ind][0]
-        # max_size = config.SCALES[scale_ind][1]
-        # im, im_scale = resize(im, target_size, max_size, stride=config.network.IMAGE_STRIDE)
-        # im_tensor = transform(im, config.network.PIXEL_MEANS)
-        # processed_ims.append(im_tensor)
+        im_info_height = im.shape[0]
+        im_info_width = im.shape[1]
         target_size = cfg.TRAIN.SCALES[scale_inds[i]]
         im, im_scale = blob_utils.prep_im_for_blob(
             im, cfg.PIXEL_MEANS, [target_size], cfg.TRAIN.MAX_SIZE
@@ -183,15 +182,29 @@ def _get_image_aug_blob(roidb):
         im=im[0]
         im_scale=im_scale[0]
         processed_ims.append(im)
-        im_info = [im.shape[0], im.shape[1], im_scale]
-        new_rec['boxes'] = _clip_boxes(np.round(boxes.copy() * im_scale), im_info[:2])
-        new_rec['polygons'] = _clip_polygons(np.round(polygons.copy() * im_scale), im_info[:2])
-        new_rec['charboxes'] = _resize_clip_char_boxes(charboxes.copy(), im_scale, im_info[:2])
+        im_info = [im_info_height, im_info_width, im_scale]
+        new_rec['boxes'] = boxes
+        new_rec['polygons'] = polygons
+        for j, polygon in enumerate(new_rec['polygons']):
+            segms[j] = [[polygon[0], polygon[1], polygon[2], polygon[3], polygon[4], polygon[5], polygon[6], polygon[7]]]
+        new_rec['segms'] = segms
+        new_rec['charboxes'] = charboxes
         new_rec['im_info'] = im_info
         processed_roidb.append(new_rec)
-        im_scales.append(1.0)
+        im_scales.append(im_scale)
+        # new_rec['height'] = new_rec['height'] * im_scale
+        # new_rec['width'] = new_rec['width'] * im_scale
+        # new_rec['boxes'] = _clip_boxes(np.round(boxes.copy() * im_scale), im_info[:2])
+        # new_rec['polygons'] = _clip_polygons(np.round(polygons.copy() * im_scale), im_info[:2])
+        # for j, polygon in enumerate(new_rec['polygons']):
+        #     segms[j] = [[polygon[0], polygon[1], polygon[2], polygon[3], polygon[4], polygon[5], polygon[6], polygon[7]]]
+        # new_rec['segms'] = segms
+        # new_rec['charboxes'] = _resize_clip_char_boxes(charboxes.copy(), im_scale, im_info[:2])
+        # new_rec['im_info'] = im_info
+        # processed_roidb.append(new_rec)
+        # im_scales.append(1.0)
 
-        # _visualize_roidb(im, new_rec['boxes'], new_rec['polygons'], new_rec['charboxes'])
+        # _visualize_roidb(im, new_rec['boxes'], new_rec['polygons'], new_rec['charboxes'], name)
 
     # Create a blob to hold the input images
     blob = blob_utils.im_list_to_blob(processed_ims)
@@ -406,7 +419,7 @@ def _boxlist2quads(boxlist):
         res[i] = np.array([box[0][0], box[0][1], box[1][0], box[1][1], box[2][0], box[2][1], box[3][0], box[3][1]])
     return res
 
-def _visualize_roidb(im, boxes, polygons, charboxes):
+def _visualize_roidb(im, boxes, polygons, charboxes, name):
     lex = '_0123456789abcdefghijklmnopqrstuvwxyz'
     img = np.array(im, dtype=np.uint8)
     img = Image.fromarray(img)
@@ -421,7 +434,7 @@ def _visualize_roidb(im, boxes, polygons, charboxes):
             char = lex[int(choose_cboxes[j][8])]
             img_draw.text(list(choose_cboxes[j][:2]), char)
 
-    img.save('./tests/visu/' + 'demo.jpg')
+    img.save('./tests/visu_data_aug/' + name)
     print('image saved')
     raw_input()
 

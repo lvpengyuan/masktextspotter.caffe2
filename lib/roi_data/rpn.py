@@ -120,7 +120,7 @@ def add_rpn_blobs(blobs, im_scales, roidb):
             blobs[k] = np.concatenate(v)
 
     valid_keys = [
-        'has_visible_keypoints', 'boxes', 'charboxes', 'segms', 'seg_areas', 'gt_classes',
+        'has_visible_keypoints', 'boxes', 'charboxes', 'segms', 'polygons', 'seg_areas', 'gt_classes',
         'gt_overlaps', 'is_crowd', 'box_to_gt_ind_map', 'gt_keypoints'
     ]
     minimal_roidb = [{} for _ in range(len(roidb))]
