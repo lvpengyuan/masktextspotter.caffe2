@@ -124,7 +124,7 @@ def polys_to_mask_wrt_box_rec(rec_rois_gt_chars, polygon, box, M_HEIGHT, M_WIDTH
     mask. The resulting mask is therefore of shape (M, M).
     """
     char_map = np.zeros((2, M_HEIGHT, M_WIDTH), dtype=np.float32)
-    char_box = np.zeros((M_HEIGHT, M_WIDTH, 4), dtype=np.int32)
+    char_box = np.zeros((M_HEIGHT, M_WIDTH, 4), dtype=np.float32)
     char_box_inside_weight = np.zeros((M_HEIGHT, M_WIDTH, 4), dtype=np.float32)
     # char_map_weight = np.zeros((2, M_HEIGHT, M_WIDTH), dtype=np.float32)
 
@@ -148,10 +148,10 @@ def polys_to_mask_wrt_box_rec(rec_rois_gt_chars, polygon, box, M_HEIGHT, M_WIDTH
         rec_rois_gt_chars[0,:,1:8:2] = (rec_rois_gt_chars[0,:,1:8:2] - ymin) * M_HEIGHT / h
         for i in range(rec_rois_gt_chars.shape[1]):  
             gt_poly = rec_rois_gt_chars[0,i,:8]
-            box_xmin = min(gt_poly[0:8:2])
-            box_xmax = max(gt_poly[0:8:2])
-            box_ymin = min(gt_poly[1:8:2])
-            box_ymax = max(gt_poly[1:8:2])
+            box_xmin = max(0,min(gt_poly[0:8:2]))
+            box_xmax = min(M_WIDTH - 1, max(gt_poly[0:8:2]))
+            box_ymin = max(0,min(gt_poly[1:8:2]))
+            box_ymax = min(M_HEIGHT - 1, max(gt_poly[1:8:2]))
             gt_poly_reshape = gt_poly.reshape((4, 2))
             char_cls = int(rec_rois_gt_chars[0,i,8])
             if shrink>0:
@@ -159,18 +159,18 @@ def polys_to_mask_wrt_box_rec(rec_rois_gt_chars, polygon, box, M_HEIGHT, M_WIDTH
             else:
                 npoly = gt_poly_reshape
             poly = npoly.astype(np.int32)
-            box_xmin_shrink = min(poly[:,0])
-            box_xmax_shrink = max(poly[:,0])
-            box_ymin_shrink = min(poly[:,1])
-            box_ymax_shrink = max(poly[:,1])
-            char_box_inside_weight[box_ymin_shrink:box_ymax_shrink+1, box_xmin_shrink:box_xmax_shrink+1, :] = 1.0
-            for i in range(box_ymin_shrink, box_ymax_shrink+1):
-                for j in range(box_xmin_shrink, box_xmax_shrink+1):
+            box_xmin_shrink = max(0, min(poly[:,0]))
+            box_xmax_shrink = min(M_WIDTH - 1, max(poly[:,0]))
+            box_ymin_shrink = max(0, min(poly[:,1]))
+            box_ymax_shrink = min(M_HEIGHT - 1, max(poly[:,1]))
+            char_box_inside_weight[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, :] = 1.0
+            for i in range(box_ymin_shrink, box_ymax_shrink):
+                for j in range(box_xmin_shrink, box_xmax_shrink):
                     # top, right, bottom, left
-                    char_box[i,j,0] = i - box_ymin
-                    char_box[i,j,1] = box_xmax - j
-                    char_box[i,j,2] = box_ymax - i
-                    char_box[i,j,3] = j - box_xmin
+                    char_box[i,j,0] = (i - box_ymin) / float(M_HEIGHT)
+                    char_box[i,j,1] = (box_xmax - j) / float(M_WIDTH)
+                    char_box[i,j,2] = (box_ymax - i) / float(M_HEIGHT)
+                    char_box[i,j,3] = (j - box_xmin) / float(M_WIDTH)
             map_tmp = np.zeros((M_HEIGHT, M_WIDTH))
             cv2.fillPoly(char_map[1,:,:], [poly], char_cls)
             # char_map_weight[1,:,:] = np.ones((M_HEIGHT, M_WIDTH))
