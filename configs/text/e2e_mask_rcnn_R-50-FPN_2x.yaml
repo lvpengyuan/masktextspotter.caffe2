@@ -4,7 +4,7 @@ MODEL:
   NUM_CLASSES: 2
   FASTER_RCNN: True
   MASK_ON: True
-  NAME: mix_finetune_mix_aug
+  NAME: mix_finetune_mix_aug_ms
 NUM_GPUS: 4
 SOLVER:
   # WEIGHT_DECAY: 0.0001
@@ -46,7 +46,7 @@ MRCNN:
   DILATION: 1  # default 2
   CONV_INIT: MSRAFill  # default GaussianFill
   IS_E2E: True
-  MASK_BATCH_SIZE_PER_IM: 512
+  MASK_BATCH_SIZE_PER_IM: 256
   WEIGHT_LOSS_MASK: 1.0
 TRAIN:
   BATCH_SIZE_PER_IM: 512
@@ -80,9 +80,10 @@ TRAIN:
   # # the ratios of synth, icdar2013, icdar2015 is 2:1:1, defaultly
 
 
-  # SCALES: (600, 800, 1000, 1200)
-  SCALES: (800,)
-  MAX_SIZE: 1333
+  SCALES: (600, 800, 1000, 1200)
+  MAX_SIZE: 1666
+  # SCALES: (800,)
+  # MAX_SIZE: 1333
   IMS_PER_BATCH: 1
   ASPECT_GROUPING: False
 
@@ -106,7 +107,8 @@ IMAGE:
   rotate_delta: 15
 TEST:
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune/model_final.pkl
-  WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune_ratio/model_iter29999.pkl
+  WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune_mix_aug/model_iter49999.pkl
+  # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune_mix_aug/model_final.pkl
   DATASETS: ('icdar2013_test',)
   SCALES: (800,)
   MAX_SIZE: 1333
