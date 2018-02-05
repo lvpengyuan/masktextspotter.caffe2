@@ -137,6 +137,9 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
             # Class labels for the foreground rois
             mask_class_labels = blobs['labels_int32'][fg_inds]
             masks = blob_utils.zeros((fg_inds.shape[0], 2, M_HEIGHT*M_WIDTH), int32=True)
+            char_boxes = np.zeros((fg_inds.shape[0], M_HEIGHT*M_WIDTH, 4), dtype=np.int32)
+            char_boxes_inside_weight = np.zeros((fg_inds.shape[0], M_HEIGHT*M_WIDTH, 4), dtype=np.float32)
+            char_boxes_outside_weight = np.zeros((fg_inds.shape[0], M_HEIGHT*M_WIDTH, 4), dtype=np.float32)
             # mask_weights = blob_utils.zeros((fg_inds.shape[0], 2, M_HEIGHT*M_WIDTH), int32=True)
 
             # Find overlap between all foreground rois and the bounding boxes
@@ -159,11 +162,13 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
                 roi_fg = rois_fg[i]
                 # Rasterize the portion of the polygon mask within the given fg roi
                 # to an M_HEIGHT x M_WIDTH binary image
-                mask = segm_utils.polys_to_mask_wrt_box_rec(chars_gt, poly_gt, roi_fg, M_HEIGHT, M_WIDTH)
+                mask, char_box, char_box_inside_weight = segm_utils.polys_to_mask_wrt_box_rec(chars_gt, poly_gt, roi_fg, M_HEIGHT, M_WIDTH)
                 mask = np.array(mask, dtype=np.int32)  # Ensure it's binary
                 # mask_weight = np.array(mask_weight, dtype=np.int32)  # Ensure it's binary
                 masks[i, 0, :] = np.reshape(mask[0,:,:], M_HEIGHT*M_WIDTH)
                 masks[i, 1, :] = np.reshape(mask[1,:,:], M_HEIGHT*M_WIDTH)
+                char_boxes[i, :, :] = np.reshape(char_box, (M_HEIGHT*M_WIDTH, 4))
+                char_boxes_inside_weight[i, :, :] = np.reshape(char_box_inside_weight, (M_HEIGHT*M_WIDTH, 4))
                 # mask_weights[i, 0, :] = np.reshape(mask_weight[0,:,:], M_HEIGHT*M_WIDTH)
                 # mask_weights[i, 1, :] = np.reshape(mask_weight[1,:,:], M_HEIGHT*M_WIDTH)
         else:  # If there are no fg masks (it does happen)
@@ -188,6 +193,9 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
             # Class labels for the foreground rois
             mask_class_labels = np.ones((fg_inds.shape[0], ), dtype=np.int32)
             masks = blob_utils.zeros((fg_inds.shape[0], 2, M_HEIGHT*M_WIDTH), int32=True)
+            char_boxes = np.zeros((fg_inds.shape[0], M_HEIGHT*M_WIDTH, 4), dtype=np.int32)
+            char_boxes_inside_weight = np.zeros((fg_inds.shape[0], M_HEIGHT*M_WIDTH, 4), dtype=np.float32)
+            char_boxes_outside_weight = np.zeros((fg_inds.shape[0], M_HEIGHT*M_WIDTH, 4), dtype=np.float32)
             # mask_weights = blob_utils.zeros((fg_inds.shape[0], 2, M_HEIGHT*M_WIDTH), int32=True)
 
             rois_fg = gt_boxes
@@ -201,7 +209,7 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
                 roi_fg = rois_fg[i]
                 # Rasterize the portion of the polygon mask within the given fg roi
                 # to an M_HEIGHT x M_WIDTH binary image
-                mask = segm_utils.polys_to_mask_wrt_box_rec(chars_gt, poly_gt, roi_fg, M_HEIGHT, M_WIDTH)
+                mask, char_box, char_box_inside_weight = segm_utils.polys_to_mask_wrt_box_rec(chars_gt, poly_gt, roi_fg, M_HEIGHT, M_WIDTH)
                 if DEBUG:
                     draw = ImageDraw.Draw(img)
                     draw.rectangle([(roi_fg[0],roi_fg[1]), (roi_fg[2],roi_fg[3])])
@@ -214,6 +222,8 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
                 # mask_weight = np.array(mask_weight, dtype=np.int32)  # Ensure it's binary
                 masks[i, 0, :] = np.reshape(mask[0,:,:], M_HEIGHT*M_WIDTH)
                 masks[i, 1, :] = np.reshape(mask[1,:,:], M_HEIGHT*M_WIDTH)
+                char_boxes[i, :, :] = np.reshape(char_box, (M_HEIGHT*M_WIDTH, 4))
+                char_boxes_inside_weight[i, :, :] = np.reshape(char_box_inside_weight, (M_HEIGHT*M_WIDTH, 4))
                 # mask_weights[i, 0, :] = np.reshape(mask_weight[0,:,:], M_HEIGHT*M_WIDTH)
                 # mask_weights[i, 1, :] = np.reshape(mask_weight[1,:,:], M_HEIGHT*M_WIDTH)
         else:  # If there are no fg masks (it does happen)
@@ -226,6 +236,8 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
             # We give it an -1's blob (ignore label)
             masks = -blob_utils.ones((1, 2, M_HEIGHT*M_WIDTH), int32=True)
             mask_weights = -blob_utils.ones((1, 2, M_HEIGHT*M_WIDTH), int32=True)
+            char_boxes = -np.ones(1, M_HEIGHT*M_WIDTH, 4, dtype=np.int32)
+            char_boxes_inside_weight = -np.ones(1, M_HEIGHT*M_WIDTH, 4, dtype=np.float32)
             # We label it with class = 0 (background)
             mask_class_labels = blob_utils.zeros((1, ))
             # Mark that the first roi has a mask
@@ -237,11 +249,18 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
     repeated_batch_idx = batch_idx * blob_utils.ones((rois_fg.shape[0], 1))
     rois_fg = np.hstack((repeated_batch_idx, rois_fg))
 
+    char_boxes_outside_weight = np.array(
+        char_boxes_inside_weight > 0, dtype=char_boxes_inside_weight.dtype
+    )
+
     # Update blobs dict with Mask R-CNN blobs
     blobs['mask_rois'] = rois_fg
     blobs['roi_has_mask_int32'] = roi_has_mask
     blobs['masks_global_int32'] = masks[:, 0, :]
     blobs['masks_char_int32'] = masks[:, 1, :].reshape((-1, M_HEIGHT, M_WIDTH))
+    blobs['char_bbox_targets'] = char_boxes.reshape((-1,4))
+    blobs['char_bbox_inside_weight'] = char_boxes_inside_weight.reshape((-1,4))
+    blobs['char_bbox_outside_weight'] = char_boxes_outside_weight.reshape((-1,4))
 
 
 

@@ -69,6 +69,10 @@ def get_fast_rcnn_blob_names(is_training=True):
         # mask size.
         blob_names += ['masks_global_int32']
         blob_names += ['masks_char_int32']
+
+        blob_names += ['char_bbox_targets']
+        blob_names += ['char_bbox_inside_weight']
+        blob_names += ['char_bbox_outside_weight']
     if is_training and cfg.MODEL.KEYPOINTS_ON:
         # 'keypoint_rois': RoIs sampled for training the keypoint prediction
         # branch. Shape is (#instances, 5) in format (batch_idx, x1, y1, x2,
