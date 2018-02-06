@@ -269,8 +269,8 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
     blobs['masks_global_int32'] = masks[:, 0, :]
     blobs['masks_char_int32'] = masks[:, 1, :].reshape((-1, M_HEIGHT, M_WIDTH))
     blobs['char_bbox_targets'] = char_boxes.reshape((-1,4))
-    blobs['char_bbox_inside_weight'] = char_boxes_inside_weight.reshape((-1,4))
-    blobs['char_bbox_outside_weight'] = char_boxes_outside_weight.reshape((-1,4))
+    blobs['char_bbox_inside_weights'] = char_boxes_inside_weight.reshape((-1,4))
+    blobs['char_bbox_outside_weights'] = char_boxes_outside_weight.reshape((-1,4))
 
 
 
