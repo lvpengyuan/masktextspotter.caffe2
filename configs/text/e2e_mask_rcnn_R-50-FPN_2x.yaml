@@ -4,7 +4,7 @@ MODEL:
   NUM_CLASSES: 2
   FASTER_RCNN: True
   MASK_ON: True
-  NAME: mix_finetune_mix_aug_ms
+  NAME: mix_finetune_aug_ms_211
 NUM_GPUS: 4
 SOLVER:
   # WEIGHT_DECAY: 0.0001
@@ -70,8 +70,8 @@ TRAIN:
   DATASETS: ('synth_train', 'icdar2013_train', 'icdar2015_train')
   USE_CHARANNS: [True, False, False]
   ## the ratios of synth, icdar2013, icdar2015 is 2:1:1, defaultly
-  # MIX_RATIOS: [0.5, 0.25, 0.25]
-  MIX_RATIOS: [0.25, 0.25, 0.5]
+  MIX_RATIOS: [0.5, 0.25, 0.25]
+  # MIX_RATIOS: [0.25, 0.25, 0.5]
 
   # # icdar13 && icdar15 are used for debug
   # DATASETS: ('icdar2013_train', 'icdar2015_train')
@@ -107,9 +107,9 @@ IMAGE:
   rotate_delta: 15
 TEST:
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune/model_final.pkl
-  WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune_mix_aug/model_iter49999.pkl
-  # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune_mix_aug/model_final.pkl
-  DATASETS: ('icdar2013_test',)
+  WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune_mix_aug_ms/model_iter89999.pkl
+  # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune_mix_aug_ms/model_final.pkl
+  DATASETS: ('icdar2015_test',)
   SCALES: (800,)
   MAX_SIZE: 1333
   NMS: 0.5
