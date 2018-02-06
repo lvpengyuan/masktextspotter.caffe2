@@ -146,7 +146,7 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
 
 
 def format_output(out_dir, boxes, img_name):
-    res = open(os.path.join(out_dir, 'res_' + img_name.split('.')[0] + '.txt'), 'w')
+    res = open(os.path.join(out_dir, 'res_' + img_name.split('.')[0] + '.txt'), 'a+')
     for box in boxes:
         box = ','.join([str(x) for x in box])
         res.write(box + '\n')
