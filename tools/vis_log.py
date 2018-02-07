@@ -79,11 +79,11 @@ def plot_log(x, y, save_name, key):
 		plt.axis([x[0], x[-1], 0, 0.4])
 	if key in ["accuracy_cls"]:
 		plt.axis([x[0], x[-1], 0.9, 1])
+	if key in ["loss_char_bbox"]:
+		plt.axis([x[0], x[-1], 0, 0.01])
 	plt.plot(x, y, 'r-', lw=2)
 	plt.plot(x, smooth(y, 20), 'g-', lw=2)
 	# plt.plot(x, savgol_filter(y, 51, 3), 'g-', lw=2)
-
-
 
 	fig.savefig(save_name)
 
