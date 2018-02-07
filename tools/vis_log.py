@@ -75,6 +75,8 @@ def plot_log(x, y, save_name, key):
 		plt.axis([x[0], x[-1], 0, 0.01])
 	if key in ["loss_rpn_cls_fpn2", "loss_rpn_cls_fpn3", "loss_rpn_cls_fpn4", "loss_rpn_cls_fpn5", "loss_rpn_cls_fpn6"]:
 		plt.axis([x[0], x[-1], 0, 0.02])
+	if key in ["loss_char_bbox"]:
+		plt.axis([x[0], x[-1], 0, 0.05])
 	if key in ["loss_global_mask", "loss_char_mask"]:
 		plt.axis([x[0], x[-1], 0, 0.4])
 	if key in ["accuracy_cls"]:

@@ -133,10 +133,16 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
                 img_poly[box[1]:box[3], box[0]:box[2]] = poly
                 img_char[box[1]:box[3], box[0]:box[2]] = char
 
-                keep_charboxes[:, 0] = keep_charboxes[:, 0]*box_w/128 + box[0]
-                keep_charboxes[:, 1] = keep_charboxes[:, 1]*box_h/32 + box[1]
-                keep_charboxes[:, 2] = keep_charboxes[:, 2]*box_w/128 + box[0]
-                keep_charboxes[:, 3] = keep_charboxes[:, 3]*box_h/32 + box[1]
+                if cfg.MRCNN.WEIGHT_WH:
+                    keep_charboxes[:, 0] = keep_charboxes[:, 0]*box_w/32 + box[0]
+                    keep_charboxes[:, 1] = keep_charboxes[:, 1]*box_h/32 + box[1]
+                    keep_charboxes[:, 2] = keep_charboxes[:, 2]*box_w/32 + box[0]
+                    keep_charboxes[:, 3] = keep_charboxes[:, 3]*box_h/32 + box[1]
+                else:
+                    keep_charboxes[:, 0] = keep_charboxes[:, 0]*box_w/128 + box[0]
+                    keep_charboxes[:, 1] = keep_charboxes[:, 1]*box_h/32 + box[1]
+                    keep_charboxes[:, 2] = keep_charboxes[:, 2]*box_w/128 + box[0]
+                    keep_charboxes[:, 3] = keep_charboxes[:, 3]*box_h/32 + box[1]
 
                 for bb in keep_charboxes:
                     img_draw.rectangle(bb, outline=(0, 255, 0))
