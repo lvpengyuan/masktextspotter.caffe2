@@ -36,7 +36,7 @@ from PIL import Image, ImageDraw
 
 logger = logging.getLogger(__name__)
 
-DEBUG = True
+DEBUG = False
 
 def add_mask_rcnn_blobs(blobs, sampled_boxes, roidb, im_scale, batch_idx):
     """Add Mask R-CNN specific blobs to the input blob dictionary."""
@@ -117,7 +117,6 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
         (roidb['gt_classes'] > 0) & (roidb['is_crowd'] == 0)
     )[0]
     polys_gt = [roidb['segms'][i] for i in polys_gt_inds]
-    boxes_gt = [roidb['boxes'][i] for i in polys_gt_inds]
     chars_gts = roidb['charboxes']
     boxes_from_polys = segm_utils.polys_to_boxes(polys_gt)
     if DEBUG:
@@ -158,20 +157,9 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
                 indexes_rec_rois_gt_chars = np.where(chars_gts[:, 9] == fg_polys_ind)
                 chars_gt = chars_gts[indexes_rec_rois_gt_chars, :9]
                 roi_fg = rois_fg[i]
-                box = boxes_gt[fg_polys_ind]
                 # Rasterize the portion of the polygon mask within the given fg roi
                 # to an M_HEIGHT x M_WIDTH binary image
-                mask = segm_utils.polys_to_mask_wrt_box_rec(chars_gt, poly_gt, box, M_HEIGHT, M_WIDTH)
-                if DEBUG:
-                    draw = ImageDraw.Draw(img)
-                    for char_box in chars_gt:
-                        draw.polygon(char_box[0:8])
-                    draw.rectangle([(box[0],box[1]), (box[2],box[3])])
-                    img.save('./tests/image.jpg')
-                    print(chars_gt)
-                    _visu_global_map(mask[0,:,:].copy(), './tests/proposals_visu_global.jpg')
-                    _visu_char_map(mask[1,:,:].copy(), './tests/proposals_visu_char.jpg')
-                    raw_input()
+                mask = segm_utils.polys_to_mask_wrt_box_rec(chars_gt, poly_gt, roi_fg, M_HEIGHT, M_WIDTH)
                 mask = np.array(mask, dtype=np.int32)  # Ensure it's binary
                 # mask_weight = np.array(mask_weight, dtype=np.int32)  # Ensure it's binary
                 masks[i, 0, :] = np.reshape(mask[0,:,:], M_HEIGHT*M_WIDTH)
