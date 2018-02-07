@@ -792,6 +792,7 @@ __C.MRCNN.THRESH_BINARIZE = 0.5
 __C.MRCNN.IS_E2E = False
 
 __C.MRCNN.MASK_BATCH_SIZE_PER_IM = 64
+__C.MRCNN.WEIGHT_WH = False
 
 # ---------------------------------------------------------------------------- #
 # Keyoint Mask R-CNN options ("KRCNN" = Mask R-CNN with Keypoint support)

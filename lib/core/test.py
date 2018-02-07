@@ -118,7 +118,7 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
             pts = get_tight_rect(corners, box[0], box[1], im.shape[0], im.shape[1], 1)
             pts_origin = [x * 1.0 for x in pts]
             pts_origin = map(int, pts_origin)
-            text, rec_score, rec_scores = getstr(char_masks[index,:,:,:].copy(), char_boxes[index, :, :, :].copy(),  box_w, box_h)
+            text, rec_score, rec_scores, keep_charboxes = getstr(char_masks[index,:,:,:].copy(), char_boxes[index, :, :, :].copy(),  box_w, box_h)
             result_log = [int(x * 1.0) for x in box[:4]] + pts_origin + [text] + [scores[index]] + [rec_score]
             result_logs.append(result_log)
             if vis:    
@@ -132,6 +132,20 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
                 char = np.array(Image.fromarray(cls_chars).resize((box_w, box_h)))
                 img_poly[box[1]:box[3], box[0]:box[2]] = poly
                 img_char[box[1]:box[3], box[0]:box[2]] = char
+
+                if cfg.MRCNN.WEIGHT_WH:
+                    keep_charboxes[:, 0] = keep_charboxes[:, 0]*box_w/32 + box[0]
+                    keep_charboxes[:, 1] = keep_charboxes[:, 1]*box_h/32 + box[1]
+                    keep_charboxes[:, 2] = keep_charboxes[:, 2]*box_w/32 + box[0]
+                    keep_charboxes[:, 3] = keep_charboxes[:, 3]*box_h/32 + box[1]
+                else:
+                    keep_charboxes[:, 0] = keep_charboxes[:, 0]*box_w/128 + box[0]
+                    keep_charboxes[:, 1] = keep_charboxes[:, 1]*box_h/32 + box[1]
+                    keep_charboxes[:, 2] = keep_charboxes[:, 2]*box_w/128 + box[0]
+                    keep_charboxes[:, 3] = keep_charboxes[:, 3]*box_h/32 + box[1]
+
+                for bb in keep_charboxes:
+                    img_draw.rectangle(bb, outline=(0, 255, 0))
         
         if vis:
             save_dir_visu = os.path.join(model_dir, model_name+'_visu')
@@ -449,7 +463,7 @@ def im_detect_mask(model, im_scales, boxes):
         core.ScopedName('mask_fcn_char_probs')
     ).squeeze()
     pred_char_boxes = workspace.FetchBlob(
-        core.ScopedName('blob_out_charbox_pred_reshape')
+        core.ScopedName('mask_fcn_charbox_pred')
     ).squeeze()
     pred_global_masks = pred_global_masks.reshape([-1, 1, M_HEIGHT, M_WIDTH])
     pred_char_masks = pred_char_masks.reshape([-1, M_HEIGHT, M_WIDTH, 37])
@@ -942,12 +956,12 @@ def segm_results(cls_boxes, masks, ref_boxes, im_h, im_w):
 
 
 
-def getstr(seg, charboxes, box_w, box_h, thresh):
+def getstr(seg, charboxes, box_w, box_h, thresh=0.8):
     mask_index = np.argmax(seg, axis=0)
     mask_index = mask_index.astype(np.uint8).reshape((-1, 1))
     charboxes = charboxes.transpose([1, 2, 0])  ## 4*h*w -> h*w*4
     ## trans charboxes to x1, y1, x2, y2
-    charboxes = dis2xyxy(charboxes).reshape((-1, 4))
+    charboxes = dis2xyxy(charboxes)
     scores = seg.transpose([1, 2, 0]).reshape((-1, 37))
     pos_index = np.where(mask_index > 0)[0]
     mask_index = mask_index[pos_index] ## N*1
@@ -957,19 +971,24 @@ def getstr(seg, charboxes, box_w, box_h, thresh):
 
     all_charboxes = []
     all_labels = []
+    print('mask_index.shape', mask_index.shape)
+    print('scores.shape', scores.shape)
     for i in range(1, 37):
         m_idx = np.where(mask_index == i)[0]
-        s_idx = np.where(scores.copy()[m_idx] > thresh)[0]
+        s_idx = np.where(scores[:, i].copy()[m_idx] > thresh)[0]
         if s_idx.size >= 1:
             ## nms
-            temp_score = scores[m_idx][s_idx]
+            temp_score = scores[:, i].copy()[m_idx][s_idx]
             temp_boxes = charboxes[m_idx][s_idx]
             dets = np.hstack((temp_boxes, temp_score[:, np.newaxis])).astype(np.float32, copy=False)
-            keep = box_utils.nms(dets, cfg.TEST.NMS)
+            print('nms thresh', cfg.TEST.NMS)
+            print('before nms', dets.shape)
+            keep = box_utils.nms(dets, 0.15)
             nms_dets = dets[keep, :]
+            print('after nms', nms_dets.shape)
             all_charboxes.append(nms_dets)
             all_labels += [i]*(keep.size)
-    all_charboxes = np.hstack(all_charboxes)
+    all_charboxes = np.vstack(all_charboxes)
     all_labels = np.array(all_labels).reshape((-1, 1))
 
     ## another nms with high nms thresh to filter out some boxes with high overlap and diferent classes
@@ -982,7 +1001,7 @@ def getstr(seg, charboxes, box_w, box_h, thresh):
         char['x'] = (all_charboxes[i][0] + all_charboxes[i][2])/2.0
         char['y'] = (all_charboxes[i][1] + all_charboxes[i][3])/2.0
         char['s'] = all_charboxes[i][4]
-        char['c'] = all_labels[i]
+        char['c'] = num2char(all_labels[i])
         chars.append(char)
     chars = sorted(chars, key = lambda x: x['x'])
     string = ''
@@ -994,16 +1013,27 @@ def getstr(seg, charboxes, box_w, box_h, thresh):
         scores.append(char['s'])
     if len(chars) > 0:
         score = score / len(chars)
-    return string, score, scores
-
+    return string, score, scores, all_charboxes
 
 def dis2xyxy(boxes):
     h, w = boxes.shape[0], boxes.shape[1]
-    for i in range(h):
-        for j in range(w):
-            top, right, bottom, left = boxes[i][j][0], boxes[i][j][1], boxes[i][j][2], boxes[i][j][3]
-            boxes[i][j] = np.array([j-left*w, i-top*h, j+right*w, i+bottom*h])
-    return boxes
+    y_index, x_index = np.where(np.ones((h, w)) > 0)
+    boxes = boxes.reshape((-1, 4))
+    top = (y_index - boxes[:, 0]*h).reshape((-1, 1))
+    right = (x_index + boxes[:, 1]*w).reshape((-1, 1))
+    bottom = (y_index + boxes[:, 2]*h).reshape((-1, 1))
+    left = (x_index - boxes[:, 3]*w).reshape((-1, 1))
+   
+    return np.hstack((left, top, right, bottom))
+
+# def dis2xyxy(boxes):
+#     h, w = boxes.shape[0], boxes.shape[1]
+#     y_index, x_index = np.where(np.ones((h, w)) > 0)
+#     for i in range(h):
+#         for j in range(w):
+#             top, right, bottom, left = boxes[i][j][0], boxes[i][j][1], boxes[i][j][2], boxes[i][j][3]
+#             boxes[i][j] = np.array([j-left*w, i-top*h, j+right*w, i+bottom*h])
+#     return boxes
 
 # def getstr(seg, box_w, box_h):
 #     pos = 255 - (seg[0]*255).astype(np.uint8)
