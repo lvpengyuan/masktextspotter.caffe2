@@ -48,7 +48,7 @@ MRCNN:
   IS_E2E: True
   MASK_BATCH_SIZE_PER_IM: 16
   WEIGHT_LOSS_MASK: 1.0
-  WEIGHT_LOSS_CHAR_BOX: 5.0
+  WEIGHT_LOSS_CHAR_BOX: 1.0
   WEIGHT_WH: False  ## default is false 
 TRAIN:
   BATCH_SIZE_PER_IM: 512
@@ -111,6 +111,7 @@ IMAGE:
 TEST:
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune/model_final.pkl
   WEIGHTS: ./train/synth_train/generalized_rcnn/east_10/model_iter154999.pkl
+
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune_mix_aug/model_final.pkl
   DATASETS: ('icdar2013_test',)
   # DATASETS: ('synth0_train',)
