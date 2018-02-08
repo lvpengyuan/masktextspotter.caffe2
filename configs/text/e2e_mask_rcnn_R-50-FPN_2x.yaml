@@ -48,7 +48,7 @@ MRCNN:
   IS_E2E: True
   MASK_BATCH_SIZE_PER_IM: 16
   WEIGHT_LOSS_MASK: 1.0
-  WEIGHT_WH: True  ## default is false 
+  WEIGHT_WH: False  ## default is false 
 TRAIN:
   BATCH_SIZE_PER_IM: 512
   RPN_PRE_NMS_TOP_N: 2000  # Per FPN level
@@ -109,7 +109,7 @@ IMAGE:
   rotate_delta: 15
 TEST:
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune/model_final.pkl
-  WEIGHTS: ./train/synth_train/generalized_rcnn/east/model_iter99999.pkl
+  WEIGHTS: ./train/synth_train/generalized_rcnn/east/model_iter154999.pkl
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune_mix_aug/model_final.pkl
   DATASETS: ('icdar2013_test',)
   # DATASETS: ('synth0_train',)
