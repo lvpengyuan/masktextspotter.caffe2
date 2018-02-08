@@ -786,6 +786,8 @@ __C.MRCNN.CLS_SPECIFIC_MASK = True
 # Multi-task loss weight for masks
 __C.MRCNN.WEIGHT_LOSS_MASK = 1.0
 
+__C.MRCNN.WEIGHT_LOSS_CHAR_BOX = 1.0
+
 # Binarization threshold for converting soft masks to hard masks
 __C.MRCNN.THRESH_BINARIZE = 0.5
 

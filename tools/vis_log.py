@@ -91,7 +91,7 @@ def plot_log(x, y, save_name, key):
 
 def vis_log(src_dir, log_file):
 	assert (os.path.exists(os.path.join(src_dir, log_file)))
-	keys = ['accuracy_cls', "iter", "loss", "loss_bbox", "loss_char_mask", "loss_cls", "loss_global_mask", "loss_rpn_bbox_fpn2", "loss_rpn_bbox_fpn3", 
+	keys = ['accuracy_cls', "iter", "loss", "loss_bbox", "loss_char_mask", "loss_cls", "loss_global_mask", "loss_rpn_bbox_fpn2", "loss_rpn_bbox_fpn3", "loss_char_bbox",
 	"loss_rpn_bbox_fpn4", "loss_rpn_bbox_fpn5", "loss_rpn_bbox_fpn6", "loss_rpn_cls_fpn2", "loss_rpn_cls_fpn3", "loss_rpn_cls_fpn4", "loss_rpn_cls_fpn5", "loss_rpn_cls_fpn6"]
 	logs = parse_log(os.path.join(src_dir, log_file), keys)
 

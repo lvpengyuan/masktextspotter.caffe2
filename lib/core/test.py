@@ -82,7 +82,7 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
         if cfg.TEST.MASK_AUG.ENABLED:
             global_masks, char_masks = im_detect_mask_aug(model, im, boxes)
         else:
-            global_masks, char_masks = im_detect_mask(model, im_scales, boxes)
+            global_masks, char_masks, char_boxes = im_detect_mask(model, im_scales, boxes)
         timers['im_detect_mask'].toc()
         scale = im_scales[0]
         if vis:
@@ -118,7 +118,7 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
             pts = get_tight_rect(corners, box[0], box[1], im.shape[0], im.shape[1], 1)
             pts_origin = [x * 1.0 for x in pts]
             pts_origin = map(int, pts_origin)
-            text, rec_score = getstr(char_masks[index,:,:,:].copy(), box_w, box_h)
+            text, rec_score, rec_scores = getstr(char_masks[index,:,:,:].copy(), char_boxes[index, :, :, :].copy(),  box_w, box_h)
             result_log = [int(x * 1.0) for x in box[:4]] + pts_origin + [text] + [scores[index]] + [rec_score]
             result_logs.append(result_log)
             if vis:    
@@ -447,18 +447,16 @@ def im_detect_mask(model, im_scales, boxes):
     ).squeeze()
     pred_char_masks = workspace.FetchBlob(
         core.ScopedName('mask_fcn_char_probs')
-        # core.ScopedName('mask_fcn_char_logits')
     ).squeeze()
-    # if cfg.MRCNN.CLS_SPECIFIC_MASK:
-    #     pred_masks = pred_masks.reshape([-1, cfg.MODEL.NUM_CLASSES, M_HEIGHT, M_WIDTH])
-    # else:
-    #     pred_masks = pred_masks.reshape([-1, 1, M_HEIGHT, M_WIDTH])
+    pred_char_boxes = workspace.FetchBlob(
+        core.ScopedName('blob_out_charbox_pred_reshape')
+    ).squeeze()
     pred_global_masks = pred_global_masks.reshape([-1, 1, M_HEIGHT, M_WIDTH])
     pred_char_masks = pred_char_masks.reshape([-1, M_HEIGHT, M_WIDTH, 37])
     pred_char_masks = pred_char_masks.transpose([0,3,1,2])
 
 
-    return pred_global_masks, pred_char_masks
+    return pred_global_masks, pred_char_masks, pred_char_boxes
 
 
 def im_detect_mask_aug(model, im, boxes):
@@ -819,7 +817,7 @@ def combine_heatmaps_size_dep(hms_ts, ds_ts, us_ts, boxes, heur_f):
     return hms_c
 
 
-def box_results_with_nms_and_limit(scores, boxes):
+def box_results_with_nms_and_limit(scores, boxes, thresh=0.0001):
     """Returns bounding-box detection results by thresholding on scores and
     applying non-maximum suppression (NMS).
 
@@ -942,22 +940,87 @@ def segm_results(cls_boxes, masks, ref_boxes, im_h, im_w):
     assert mask_ind == masks.shape[0]
     return cls_segms
 
-def getstr(seg, box_w, box_h):
-    pos = 255 - (seg[0]*255).astype(np.uint8)
-    mask_index = np.argmax(seg, axis=0)
-    mask_index = mask_index.astype(np.uint8)
-    pos = pos.astype(np.uint8)
-    seg = seg*255
-    seg = seg.astype(np.uint8)
-    ## resize pos and mask_index
 
-    pos = np.array(Image.fromarray(pos).resize((box_w, box_h)))
-    seg_resize = np.zeros((seg.shape[0], box_h, box_w))
-    for i in range(seg.shape[0]):
-        seg_resize[i,:,:] = np.array(Image.fromarray(seg[i,:,:]).resize((box_w, box_h)))
-    mask_index = np.array(Image.fromarray(mask_index).resize((box_w, box_h), Image.NEAREST))
-    string, score = seg2text(pos, mask_index, seg_resize)
-    return string, score
+
+def getstr(seg, charboxes, box_w, box_h, thresh):
+    mask_index = np.argmax(seg, axis=0)
+    mask_index = mask_index.astype(np.uint8).reshape((-1, 1))
+    charboxes = charboxes.transpose([1, 2, 0])  ## 4*h*w -> h*w*4
+    ## trans charboxes to x1, y1, x2, y2
+    charboxes = dis2xyxy(charboxes).reshape((-1, 4))
+    scores = seg.transpose([1, 2, 0]).reshape((-1, 37))
+    pos_index = np.where(mask_index > 0)[0]
+    mask_index = mask_index[pos_index] ## N*1
+    scores = scores[pos_index]  ## N*37
+    charboxes = charboxes[pos_index]  ## N*4
+
+
+    all_charboxes = []
+    all_labels = []
+    for i in range(1, 37):
+        m_idx = np.where(mask_index == i)[0]
+        s_idx = np.where(scores.copy()[m_idx] > thresh)[0]
+        if s_idx.size >= 1:
+            ## nms
+            temp_score = scores[m_idx][s_idx]
+            temp_boxes = charboxes[m_idx][s_idx]
+            dets = np.hstack((temp_boxes, temp_score[:, np.newaxis])).astype(np.float32, copy=False)
+            keep = box_utils.nms(dets, cfg.TEST.NMS)
+            nms_dets = dets[keep, :]
+            all_charboxes.append(nms_dets)
+            all_labels += [i]*(keep.size)
+    all_charboxes = np.hstack(all_charboxes)
+    all_labels = np.array(all_labels).reshape((-1, 1))
+
+    ## another nms with high nms thresh to filter out some boxes with high overlap and diferent classes
+    keep = box_utils.nms(all_charboxes, 0.7)
+    all_labels = all_labels[keep]
+    all_charboxes = all_charboxes[keep]
+    chars = []
+    for i in range(all_charboxes.shape[0]):
+        char = {}
+        char['x'] = (all_charboxes[i][0] + all_charboxes[i][2])/2.0
+        char['y'] = (all_charboxes[i][1] + all_charboxes[i][3])/2.0
+        char['s'] = all_charboxes[i][4]
+        char['c'] = all_labels[i]
+        chars.append(char)
+    chars = sorted(chars, key = lambda x: x['x'])
+    string = ''
+    score = 0
+    scores = []
+    for char in chars:
+        string = string + char['c']
+        score += char['s']
+        scores.append(char['s'])
+    if len(chars) > 0:
+        score = score / len(chars)
+    return string, score, scores
+
+
+def dis2xyxy(boxes):
+    h, w = boxes.shape[0], boxes.shape[1]
+    for i in range(h):
+        for j in range(w):
+            top, right, bottom, left = boxes[i][j][0], boxes[i][j][1], boxes[i][j][2], boxes[i][j][3]
+            boxes[i][j] = np.array([j-left*w, i-top*h, j+right*w, i+bottom*h])
+    return boxes
+
+# def getstr(seg, box_w, box_h):
+#     pos = 255 - (seg[0]*255).astype(np.uint8)
+#     mask_index = np.argmax(seg, axis=0)
+#     mask_index = mask_index.astype(np.uint8)
+#     pos = pos.astype(np.uint8)
+#     seg = seg*255
+#     seg = seg.astype(np.uint8)
+#     ## resize pos and mask_index
+
+#     pos = np.array(Image.fromarray(pos).resize((box_w, box_h)))
+#     seg_resize = np.zeros((seg.shape[0], box_h, box_w))
+#     for i in range(seg.shape[0]):
+#         seg_resize[i,:,:] = np.array(Image.fromarray(seg[i,:,:]).resize((box_w, box_h)))
+#     mask_index = np.array(Image.fromarray(mask_index).resize((box_w, box_h), Image.NEAREST))
+#     string, score = seg2text(pos, mask_index, seg_resize)
+#     return string, score
 
 def char2num(char):
     if char in '0123456789':

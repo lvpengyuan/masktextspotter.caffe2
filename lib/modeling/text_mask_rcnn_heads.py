@@ -79,6 +79,18 @@ def add_mask_rcnn_outputs(model, blob_in, dim):
         bias_init=const_fill(0.0)
     )
 
+    blob_out_charbox_pred = model.Conv(
+        blob_in,
+        'mask_fcn_charbox_pred',
+        dim,
+        4,
+        kernel=1,
+        pad=0,
+        stride=1,
+        weight_init=(fill, {'std': 0.001}),
+        bias_init=const_fill(0.0)
+    )
+
     if cfg.MRCNN.UPSAMPLE_RATIO > 1:
         blob_out_global = model.BilinearInterpolation(
             'mask_fcn_global_logits', 'mask_fcn_global_logits_up', 1, 1,
@@ -88,6 +100,15 @@ def add_mask_rcnn_outputs(model, blob_in, dim):
             'mask_fcn_char_logits', 'mask_fcn_char_logits_up', num_cls, num_cls,
             cfg.MRCNN.UPSAMPLE_RATIO
         )
+        blob_out_charbox_pred = model.BilinearInterpolation(
+            'mask_fcn_charbox_pred', 'mask_fcn_charbox_pred_up', 4, 4,
+            cfg.MRCNN.UPSAMPLE_RATIO
+        )
+
+    ## transpose and reshape box_pred
+    if model.train:
+        blob_out_charbox_pred = model.net.Transpose(blob_out_charbox_pred, 'blob_out_charbox_pred_trans', axes=[0,2,3,1])
+        blob_out_charbox_pred, _ = model.net.Reshape(blob_out_charbox_pred, ['blob_out_charbox_pred_reshape', 'blob_out_charbox_pred_old_shape'], shape=(-1, 4))
     
     if not model.train:  # == if test
         blob_out_global = model.net.Sigmoid(blob_out_global, 'mask_fcn_global_probs')
@@ -96,7 +117,7 @@ def add_mask_rcnn_outputs(model, blob_in, dim):
         blob_out_char = model.net.Softmax(blob_out_char, 'mask_fcn_char_probs', axis=1)
 
 
-    return [blob_out_global, blob_out_char]
+    return [blob_out_global, blob_out_char, blob_out_charbox_pred]
 
 
 def add_mask_rcnn_losses(model, blob_mask):
@@ -111,8 +132,17 @@ def add_mask_rcnn_losses(model, blob_mask):
         ['mask_cls_prob', 'loss_char_mask'],
         scale=1. / cfg.NUM_GPUS * cfg.MRCNN.WEIGHT_LOSS_MASK
     )
-    loss_gradients = blob_utils.get_loss_gradients(model, [loss_global_mask, loss_char_mask])
-    model.AddLosses(['loss_global_mask', 'loss_char_mask'])
+    loss_char_bbox = model.net.SmoothL1Loss(
+        [
+            blob_mask[2], 'char_bbox_targets', 'char_bbox_inside_weights',
+            'char_bbox_outside_weights'
+        ],
+        'loss_char_bbox',
+        scale=1. / cfg.NUM_GPUS * cfg.MRCNN.WEIGHT_LOSS_CHAR_BOX
+    )
+
+    loss_gradients = blob_utils.get_loss_gradients(model, [loss_global_mask, loss_char_mask, loss_char_bbox])
+    model.AddLosses(['loss_global_mask', 'loss_char_mask', 'loss_char_bbox'])
     return loss_gradients
 
 
