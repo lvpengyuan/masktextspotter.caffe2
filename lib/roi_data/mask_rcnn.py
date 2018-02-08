@@ -162,7 +162,7 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
                 roi_fg = rois_fg[i]
                 # Rasterize the portion of the polygon mask within the given fg roi
                 # to an M_HEIGHT x M_WIDTH binary image
-                mask, char_box, char_box_inside_weight = segm_utils.polys_to_mask_wrt_box_rec(chars_gt, poly_gt, roi_fg, M_HEIGHT, M_WIDTH)
+                mask, char_box, char_box_inside_weight = segm_utils.polys_to_mask_wrt_box_rec(chars_gt, poly_gt, roi_fg, M_HEIGHT, M_WIDTH, weight_wh=cfg.MRCNN.WEIGHT_WH)
                 if DEBUG:
                     draw = ImageDraw.Draw(img)
                     draw.rectangle([(roi_fg[0],roi_fg[1]), (roi_fg[2],roi_fg[3])])
@@ -218,7 +218,7 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
                 roi_fg = rois_fg[i]
                 # Rasterize the portion of the polygon mask within the given fg roi
                 # to an M_HEIGHT x M_WIDTH binary image
-                mask, char_box, char_box_inside_weight = segm_utils.polys_to_mask_wrt_box_rec(chars_gt, poly_gt, roi_fg, M_HEIGHT, M_WIDTH)
+                mask, char_box, char_box_inside_weight = segm_utils.polys_to_mask_wrt_box_rec(chars_gt, poly_gt, roi_fg, M_HEIGHT, M_WIDTH, weight_wh=cfg.MRCNN.WEIGHT_WH)
                 if DEBUG:
                     # draw = ImageDraw.Draw(img)
                     # draw.rectangle([(roi_fg[0],roi_fg[1]), (roi_fg[2],roi_fg[3])])

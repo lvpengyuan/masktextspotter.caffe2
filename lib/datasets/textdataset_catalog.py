@@ -43,6 +43,14 @@ DATASETS = {
         IM_LIST:
             _DATA_DIR + '/synth/train_list.txt'
     },
+    'synth0_train': {
+        IM_DIR:
+            _DATA_DIR + '/synth0/train_images',
+        ANN_FN:
+            _DATA_DIR + '/synth0/train_gts',
+        IM_LIST:
+            _DATA_DIR + '/synth0/train_list.txt'
+    },
     'icdar2013_train': {
         IM_DIR:
             _DATA_DIR + '/icdar2013/train_images',

@@ -117,7 +117,7 @@ def polys_to_mask_wrt_box(polygons, box, M):
     mask = np.array(mask > 0, dtype=np.float32)
     return mask
 
-def polys_to_mask_wrt_box_rec(rec_rois_gt_chars, polygon, box, M_HEIGHT, M_WIDTH, shrink = 0.25):
+def polys_to_mask_wrt_box_rec(rec_rois_gt_chars, polygon, box, M_HEIGHT, M_WIDTH, shrink = 0.25, weight_wh=False):
     """Convert from the COCO polygon segmentation format to a binary mask
     encoded as a 2D array of data type numpy.float32. The polygon segmentation
     is understood to be enclosed in the given box and rasterized to an M x M
@@ -164,14 +164,26 @@ def polys_to_mask_wrt_box_rec(rec_rois_gt_chars, polygon, box, M_HEIGHT, M_WIDTH
             box_ymin_shrink = max(0, min(poly[:,1]))
             box_ymax_shrink = min(M_HEIGHT - 1, max(poly[:,1]))
             if box_xmax_shrink - box_xmin_shrink>0 and box_ymax_shrink - box_ymin_shrink>0:
-                char_box_inside_weight[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, :] = 1.0
+                if weight_wh:
+                    char_box_inside_weight[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 0] = 1.0
+                    char_box_inside_weight[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 1] = (box_ymax - box_ymin)*1.0/(box_xmax - box_xmin)
+                    char_box_inside_weight[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 2] = 1.0
+                    char_box_inside_weight[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 3] = (box_ymax - box_ymin)*1.0/(box_xmax - box_xmin)
+                else:
+                    char_box_inside_weight[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, :] = 1.0
                 tmp_char_box = np.zeros((M_HEIGHT, M_WIDTH))
                 tmp_char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink] = 1.0
                 index = np.where(tmp_char_box == 1)
-                char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 0] = np.reshape((index[0] - box_ymin) / float(M_HEIGHT), (box_ymax_shrink - box_ymin_shrink, box_xmax_shrink - box_xmin_shrink))
-                char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 1] = np.reshape((box_xmax - index[1]) / float(M_WIDTH), (box_ymax_shrink - box_ymin_shrink, box_xmax_shrink - box_xmin_shrink))
-                char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 2] = np.reshape((box_ymax - index[0]) / float(M_HEIGHT), (box_ymax_shrink - box_ymin_shrink, box_xmax_shrink - box_xmin_shrink))
-                char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 3] = np.reshape((index[1] - box_xmin) / float(M_WIDTH), (box_ymax_shrink - box_ymin_shrink, box_xmax_shrink - box_xmin_shrink))
+                if weight_wh:
+                    char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 0] = np.reshape((index[0] - box_ymin) / float(M_HEIGHT), (box_ymax_shrink - box_ymin_shrink, box_xmax_shrink - box_xmin_shrink))
+                    char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 1] = np.reshape((box_xmax - index[1]) / float(M_HEIGHT), (box_ymax_shrink - box_ymin_shrink, box_xmax_shrink - box_xmin_shrink))
+                    char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 2] = np.reshape((box_ymax - index[0]) / float(M_HEIGHT), (box_ymax_shrink - box_ymin_shrink, box_xmax_shrink - box_xmin_shrink))
+                    char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 3] = np.reshape((index[1] - box_xmin) / float(M_HEIGHT), (box_ymax_shrink - box_ymin_shrink, box_xmax_shrink - box_xmin_shrink))
+                else:
+                    char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 0] = np.reshape((index[0] - box_ymin) / float(M_HEIGHT), (box_ymax_shrink - box_ymin_shrink, box_xmax_shrink - box_xmin_shrink))
+                    char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 1] = np.reshape((box_xmax - index[1]) / float(M_WIDTH), (box_ymax_shrink - box_ymin_shrink, box_xmax_shrink - box_xmin_shrink))
+                    char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 2] = np.reshape((box_ymax - index[0]) / float(M_HEIGHT), (box_ymax_shrink - box_ymin_shrink, box_xmax_shrink - box_xmin_shrink))
+                    char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 3] = np.reshape((index[1] - box_xmin) / float(M_WIDTH), (box_ymax_shrink - box_ymin_shrink, box_xmax_shrink - box_xmin_shrink))
                 # for i in range(box_ymin_shrink, box_ymax_shrink):
                 #     for j in range(box_xmin_shrink, box_xmax_shrink):
                 #         # top, right, bottom, left
