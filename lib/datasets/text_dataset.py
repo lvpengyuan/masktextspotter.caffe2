@@ -143,11 +143,11 @@ class TextDataSet(object):
         # xmaxs = max(charbbs[:,0], charbbs[:,2], charbbs[:,4], charbbs[:,6])
         # ymins = min(charbbs[:,1], charbbs[:,3], charbbs[:,5], charbbs[:,7])
         # ymaxs = max(charbbs[:,1], charbbs[:,3], charbbs[:,5], charbbs[:,7])
-        if min(xmaxs - xmins) < self.min_proposal_size:
-            return False
-        if min(ymaxs - ymins) < self.min_proposal_size:
-            return False
-        return True
+        # if min(xmaxs - xmins) < self.min_proposal_size:
+        #     return False
+        # if min(ymaxs - ymins) < self.min_proposal_size:
+        #     return False
+        return np.logical_and(xmaxs - xmins > self.min_proposal_size, ymaxs - ymins > self.min_proposal_size)
 
     def load_gt_from_txt(self, gt_path, height, width):
         lines = open(gt_path).readlines()
@@ -168,7 +168,6 @@ class TextDataSet(object):
     
                 ## filter out small objects and assign an index for the kept box
                 if max_x - min_x  <= self.min_proposal_size  or max_y - min_y <= self.min_proposal_size or min_x < 0 or min_y < 0 or max_x>width or max_y>height or area < cfg.TRAIN.GT_MIN_AREA:
-                    #return [], np.zeros((0, 4), dtype=np.float32), np.zeros((0, 8), dtype=np.float32), np.zeros((0, 10), dtype=np.float32)
                     continue
                 else:
                     tindex = len(boxes)
@@ -176,30 +175,27 @@ class TextDataSet(object):
                     seg_areas.append(area)
                     polygons.append(loc[0, :])
                     segmentations.append([[loc[0][0], loc[0][1], loc[0][2], loc[0][3], loc[0][4], loc[0][5], loc[0][6], loc[0][7]]])
+                    words.append(strs)
                     if loc.shape[0] == 1 :
-                        charbbs = np.zeros((1, 10), dtype=np.float32)
-                        charbbs.fill(-1)
+                        charbbs = np.zeros((0, 10), dtype=np.float32)
                     else:
                         charbbs = np.zeros((loc.shape[0] - 1, 10), dtype=np.float32)
                     ## char2num
                     c_class = self.char2num(strs[1:])
-                    valid = False
                     if loc.shape[0] > 1:
                         charbbs[:, :8] = loc[1:, :]
                         valid = self.check_charbbs(charbbs)
-                    if not valid:
-                        charbbs[:, 9] = -1
-                    else:
-                        charbbs[:, 8] = np.array(c_class)
+                        print(valid)
+                        charbbs = charbbs[valid]
+                        charbbs[:, 8] = np.array(c_class)[valid]
                         charbbs[:, 9] = tindex
-                    charboxes.append(charbbs)
-                    words.append(strs)
+                        if charbbs.shape[0] > 0:
+                            charboxes.append(charbbs)
         if len(boxes) > 0:
             if self.use_charann:
                 return words, np.array(boxes), np.array(polygons), np.vstack(charboxes), np.array(seg_areas), segmentations
             else:
-                charbbs = np.zeros((1, 10), dtype=np.float32)
-                charbbs.fill(-1) 
+                charbbs = np.zeros((0, 10), dtype=np.float32)
                 return words, np.array(boxes), np.array(polygons), charbbs, np.array(seg_areas), segmentations
         else:
             return [], np.zeros((0, 4), dtype=np.float32), np.zeros((0, 8), dtype=np.float32), np.zeros((0, 10), dtype=np.float32), np.zeros((0), dtype=np.float32), []
@@ -274,5 +270,5 @@ class TextDataSet(object):
 
 
 
-	
+    
 

@@ -182,6 +182,8 @@ def _get_image_aug_blob(roidb):
         im=im[0]
         im_scale=im_scale[0]
         processed_ims.append(im)
+        new_rec['height'] = im_info_height
+        new_rec['width'] = im_info_width
         im_info = [im_info_height, im_info_width, im_scale]
         new_rec['boxes'] = boxes
         new_rec['polygons'] = polygons
