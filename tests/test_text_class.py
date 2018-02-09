@@ -74,29 +74,27 @@ def random_color():
 	return (r, g, b)
 
 def vis_roidb(roidb):
-	img_path = roidb['image']
-	flip = roidb['flipped']
-	boxes = roidb['boxes']
-	polygons = roidb['polygons']
-	charboxes = roidb['charboxes']
-	lex = '_0123456789abcdefghijklmnopqrstuvwxyz'
+    img_path = roidb['image']
+    flip = roidb['flipped']
+    boxes = roidb['boxes']
+    polygons = roidb['polygons']
+    charboxes = roidb['charboxes']
+    lex = '_0123456789abcdefghijklmnopqrstuvwxyz'
+    img = Image.open(img_path)
+    if flip:
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)
+    img_draw = ImageDraw.Draw(img)
+    for i in range(boxes.shape[0]):
+        color = random_color()
+        img_draw.rectangle(list(boxes[i][:4]), outline=color)
+        img_draw.polygon(list(polygons[i]), outline=color)
+        choose_cboxes = charboxes[np.where(charboxes[:, -1] == i)[0], :]
+        for j in range(choose_cboxes.shape[0]):
+            img_draw.polygon(list(choose_cboxes[j][:8]), outline=color)
+            char = lex[int(choose_cboxes[j][8])]
+            img_draw.text(list(choose_cboxes[j][:2]), char)
 
-	img = Image.open(img_path)
-	if flip:
-		img = img.transpose(Image.FLIP_LEFT_RIGHT)
-
-	img_draw = ImageDraw.Draw(img)
-	for i in range(boxes.shape[0]):
-		color = random_color()
-		img_draw.rectangle(list(boxes[i][:4]), outline=color)
-		img_draw.polygon(list(polygons[i]), outline=color)
-		choose_cboxes = charboxes[np.where(charboxes[:, -1] == i)[0], :]
-		for j in range(choose_cboxes.shape[0]):
-			img_draw.polygon(list(choose_cboxes[j][:8]), outline=color)
-			char = lex[int(choose_cboxes[j][8])]
-			img_draw.text(list(choose_cboxes[j][:2]), char)
-
-	img.save('./tests/vis_dataset_icdar/' + img_path.strip().split('/')[-1])
+    img.save('./tests/vis_dataset_icdar/' + img_path.strip().split('/')[-1])
 
 	
 
@@ -114,7 +112,7 @@ def main(opts):
         cfg.TRAIN.DATASETS, cfg.TRAIN.PROPOSAL_FILES, cfg.TRAIN.USE_CHARANNS)
     for roibd in roidbs:
         for i in range(50):
-            entry = roibd[random.randint(0, len(roibd))]
+            entry = roibd[random.randint(0, len(roibd)-1)]
             vis_roidb(entry)
         raw_input()
 
