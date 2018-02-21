@@ -119,7 +119,7 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
             pts = get_tight_rect(corners, box[0], box[1], im.shape[0], im.shape[1], 1)
             pts_origin = [x * 1.0 for x in pts]
             pts_origin = map(int, pts_origin)
-            text, rec_score, rec_scores, keep_charboxes = getstr(char_masks[index,:,:,:].copy(), char_boxes[index, :, :, :].copy(),  box_w, box_h)
+            text, rec_score, rec_scores, keep_charboxes = getstr(char_masks[index,:,:,:].copy(), char_boxes[index, :, :, :].copy(),  box_w, box_h, weight_wh=cfg.MRCNN.WEIGHT_WH)
             result_log = [int(x * 1.0) for x in box[:4]] + pts_origin + [text] + [scores[index]] + [rec_score]
             result_logs.append(result_log)
             if vis:    
@@ -134,16 +134,16 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
                 img_poly[box[1]:box[3], box[0]:box[2]] = poly
                 img_char[box[1]:box[3], box[0]:box[2]] = char
 
-                if cfg.MRCNN.WEIGHT_WH:
-                    keep_charboxes[:, 0] = keep_charboxes[:, 0]*box_w/32 + box[0]
-                    keep_charboxes[:, 1] = keep_charboxes[:, 1]*box_h/32 + box[1]
-                    keep_charboxes[:, 2] = keep_charboxes[:, 2]*box_w/32 + box[0]
-                    keep_charboxes[:, 3] = keep_charboxes[:, 3]*box_h/32 + box[1]
-                else:
-                    keep_charboxes[:, 0] = keep_charboxes[:, 0]*box_w/128 + box[0]
-                    keep_charboxes[:, 1] = keep_charboxes[:, 1]*box_h/32 + box[1]
-                    keep_charboxes[:, 2] = keep_charboxes[:, 2]*box_w/128 + box[0]
-                    keep_charboxes[:, 3] = keep_charboxes[:, 3]*box_h/32 + box[1]
+                # if cfg.MRCNN.WEIGHT_WH:
+                #     keep_charboxes[:, 0] = keep_charboxes[:, 0]*box_w/32 + box[0]
+                #     keep_charboxes[:, 1] = keep_charboxes[:, 1]*box_h/32 + box[1]
+                #     keep_charboxes[:, 2] = keep_charboxes[:, 2]*box_w/32 + box[0]
+                #     keep_charboxes[:, 3] = keep_charboxes[:, 3]*box_h/32 + box[1]
+                # else:
+                keep_charboxes[:, 0] = keep_charboxes[:, 0]*box_w/128 + box[0]
+                keep_charboxes[:, 1] = keep_charboxes[:, 1]*box_h/32 + box[1]
+                keep_charboxes[:, 2] = keep_charboxes[:, 2]*box_w/128 + box[0]
+                keep_charboxes[:, 3] = keep_charboxes[:, 3]*box_h/32 + box[1]
 
                 for bb in keep_charboxes:
                     img_draw.rectangle(bb, outline=(0, 255, 0))
@@ -959,7 +959,7 @@ def segm_results(cls_boxes, masks, ref_boxes, im_h, im_w):
 
 
 
-def getstr(seg, charboxes, box_w, box_h, thresh_s=0.3, is_lanms=True):
+def getstr(seg, charboxes, box_w, box_h, thresh_s=0.3, is_lanms=True, weight_wh=False):
     bg_map = (1 - seg[0, :, :])
     bg_map = cv2.GaussianBlur(bg_map, (3, 3), sigmaX=3)
     ret, thresh = cv2.threshold(bg_map, 0.15, 1, cv2.THRESH_BINARY)
@@ -974,7 +974,7 @@ def getstr(seg, charboxes, box_w, box_h, thresh_s=0.3, is_lanms=True):
     mask_index = mask_index.astype(np.uint8).reshape((-1, 1))
     charboxes = charboxes.transpose([1, 2, 0])  ## 4*h*w -> h*w*4
     ## trans charboxes to x1, y1, x2, y2
-    charboxes = dis2xyxy(charboxes)
+    charboxes = dis2xyxy(charboxes, weight_wh)
     scores = seg.transpose([1, 2, 0]).reshape((-1, 37))
 
     keep_pixels = np.where(eroded ==1)[0]
@@ -1053,15 +1053,20 @@ def shrink_single_box(poly):
 
 
 
-def dis2xyxy(boxes):
+def dis2xyxy(boxes, weight_wh):
     h, w = boxes.shape[0], boxes.shape[1]
     y_index, x_index = np.where(np.ones((h, w)) > 0)
     boxes = boxes.reshape((-1, 4))
-    top = (y_index - boxes[:, 0]*h).reshape((-1, 1))
-    right = (x_index + boxes[:, 1]*w).reshape((-1, 1))
-    bottom = (y_index + boxes[:, 2]*h).reshape((-1, 1))
-    left = (x_index - boxes[:, 3]*w).reshape((-1, 1))
-   
+    if weight_wh:
+        top = (y_index - boxes[:, 0]*h).reshape((-1, 1))
+        right = (x_index + boxes[:, 1]*h).reshape((-1, 1))
+        bottom = (y_index + boxes[:, 2]*h).reshape((-1, 1))
+        left = (x_index - boxes[:, 3]*h).reshape((-1, 1))
+    else:
+        top = (y_index - boxes[:, 0]*h).reshape((-1, 1))
+        right = (x_index + boxes[:, 1]*w).reshape((-1, 1))
+        bottom = (y_index + boxes[:, 2]*h).reshape((-1, 1))
+        left = (x_index - boxes[:, 3]*w).reshape((-1, 1))
     return np.hstack((left, top, right, bottom))
 
 def box2poly(boxes):
