@@ -111,6 +111,8 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
             xy=np.transpose(xy)
             hull = cv2.convexHull(xy, clockwise=True)
             #reverse order of points.
+            if  hull is None:
+                continue
             hull=hull[::-1]
             #find minimum area bounding box.
             rect = cv2.minAreaRect(hull)

@@ -41,7 +41,7 @@ class TextDataSet(object):
     def __init__(self, name):
         assert name in DATASETS.keys(), 'Unknown dataset name: {}'.format(name)
         assert os.path.exists(DATASETS[name][IM_DIR]), 'Image directory \'{}\' not found'.format(DATASETS[name][IM_DIR])
-        assert os.path.exists(DATASETS[name][ANN_FN]), 'Annotation file \'{}\' not found'.format(DATASETS[name][ANN_FN])
+        # assert os.path.exists(DATASETS[name][ANN_FN]), 'Annotation file \'{}\' not found'.format(DATASETS[name][ANN_FN])
         assert os.path.exists(DATASETS[name][IM_LIST]), 'Annotation file \'{}\' not found'.format(DATASETS[name][IM_LIST])
         logger.debug('Creating: {}'.format(name))
         self.name = name
