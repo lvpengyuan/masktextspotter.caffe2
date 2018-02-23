@@ -86,7 +86,7 @@ DATASETS = {
             _DATA_DIR + '/icdar2015/test_gts',
         IM_LIST:
             _DATA_DIR + '/icdar2015/test_list.txt'
-    }
+    },
     'totaltext_test': {
         IM_DIR:
             _DATA_DIR + '/totaltext/test_images',
