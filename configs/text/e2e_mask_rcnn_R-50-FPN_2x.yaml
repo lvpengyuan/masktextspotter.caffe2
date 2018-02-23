@@ -109,9 +109,9 @@ IMAGE:
   rotate_delta: 15
 TEST:
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune/model_final.pkl
-  WEIGHTS: ./train/synth_train/generalized_rcnn/east/model_iter99999.pkl
+  WEIGHTS: ./train/synth_train/generalized_rcnn/east/model_iter164999.pkl
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune_mix_aug/model_final.pkl
-  DATASETS: ('icdar2013_test',)
+  DATASETS: ('total_test',)
   # DATASETS: ('synth0_train',)
   SCALES: (800,)
   MAX_SIZE: 1333
