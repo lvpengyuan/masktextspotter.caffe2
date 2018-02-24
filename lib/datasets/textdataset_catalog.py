@@ -86,5 +86,14 @@ DATASETS = {
             _DATA_DIR + '/icdar2015/test_gts',
         IM_LIST:
             _DATA_DIR + '/icdar2015/test_list.txt'
+    },
+    'totaltext_test': {
+        IM_DIR:
+            _DATA_DIR + '/totaltext/test_images',
+        # use filtered validation as there is an issue converting contours
+        ANN_FN:
+            _DATA_DIR + '/totaltext/test_gts',
+        IM_LIST:
+            _DATA_DIR + '/totaltext/test_list.txt'
     }
 }

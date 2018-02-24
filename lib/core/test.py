@@ -111,6 +111,8 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
             xy=np.transpose(xy)
             hull = cv2.convexHull(xy, clockwise=True)
             #reverse order of points.
+            if  hull is None:
+                continue
             hull=hull[::-1]
             #find minimum area bounding box.
             rect = cv2.minAreaRect(hull)
@@ -161,7 +163,7 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
 
 
 def format_output(out_dir, boxes, img_name):
-    res = open(os.path.join(out_dir, 'res_' + img_name.split('.')[0] + '.txt'), 'w')
+    res = open(os.path.join(out_dir, 'res_' + img_name.split('.')[0] + '.txt'), 'a+')
     for box in boxes:
         box = ','.join([str(x) for x in box])
         res.write(box + '\n')
