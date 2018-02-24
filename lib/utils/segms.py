@@ -137,9 +137,9 @@ def polys_to_mask_wrt_box_rec(rec_rois_gt_chars, polygon, box, M_HEIGHT, M_WIDTH
     h = np.maximum(h, 1)
 
     polygon_norm = np.array(polygon[0], dtype=np.float32)
-    polygon_norm[0:8:2] = (polygon_norm[0:8:2] - xmin) * M_WIDTH / w
-    polygon_norm[1:8:2] = (polygon_norm[1:8:2] - ymin) * M_HEIGHT / h
-    polygon_reshape = polygon_norm.reshape((4, 2)).astype(np.int32)
+    polygon_norm[0::2] = (polygon_norm[0::2] - xmin) * M_WIDTH / w
+    polygon_norm[1::2] = (polygon_norm[1::2] - ymin) * M_HEIGHT / h
+    polygon_reshape = polygon_norm.reshape((-1, 2)).astype(np.int32)
     cv2.fillPoly(char_map[0,:,:], [polygon_reshape], 1)
     # char_map_weight[0,:,:] = np.ones((M_HEIGHT, M_WIDTH))
 
