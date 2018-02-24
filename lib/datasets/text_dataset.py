@@ -112,22 +112,26 @@ class TextDataSet(object):
 
 
     def line2boxes(self, line):
-        parts = line.strip().split(',')
-        if '\xef\xbb\xbf' in parts[0]:
-            parts[0] = parts[0][3:]
-        if '\ufeff' in parts[0]:
-            parts[0] = parts[0].replace('\ufeff', '')
-        x1 = np.array([int(float(x)) for x in parts[::9]])
-        y1 = np.array([int(float(x)) for x in parts[1::9]])
-        x2 = np.array([int(float(x)) for x in parts[2::9]])
-        y2 = np.array([int(float(x)) for x in parts[3::9]])
-        x3 = np.array([int(float(x)) for x in parts[4::9]])
-        y3 = np.array([int(float(x)) for x in parts[5::9]])
-        x4 = np.array([int(float(x)) for x in parts[6::9]])
-        y4 = np.array([int(float(x)) for x in parts[7::9]])
-        strs = parts[8::9]
-        loc = np.vstack((x1, y1, x2, y2, x3, y3, x4, y4)).transpose()
-        return strs, loc
+        if self.name == 'totaltext_train':
+            parts = line.strip().split(',')
+            return [parts[-1]], np.array([[float(x) for x in parts[:-1]]])
+        else:
+            parts = line.strip().split(',')
+            if '\xef\xbb\xbf' in parts[0]:
+                parts[0] = parts[0][3:]
+            if '\ufeff' in parts[0]:
+                parts[0] = parts[0].replace('\ufeff', '')
+            x1 = np.array([int(float(x)) for x in parts[::9]])
+            y1 = np.array([int(float(x)) for x in parts[1::9]])
+            x2 = np.array([int(float(x)) for x in parts[2::9]])
+            y2 = np.array([int(float(x)) for x in parts[3::9]])
+            x3 = np.array([int(float(x)) for x in parts[4::9]])
+            y3 = np.array([int(float(x)) for x in parts[5::9]])
+            x4 = np.array([int(float(x)) for x in parts[6::9]])
+            y4 = np.array([int(float(x)) for x in parts[7::9]])
+            strs = parts[8::9]
+            loc = np.vstack((x1, y1, x2, y2, x3, y3, x4, y4)).transpose()
+            return strs, loc
 
     def char2num(self, chars):
         ## chars ['h', 'e', 'l', 'l', 'o']
@@ -158,7 +162,7 @@ class TextDataSet(object):
             if word == '###':
                 continue
             else:
-                rect = list(loc[0, :])
+                rect = list(loc[0])
                 min_x = min(rect[::2]) - 1
                 min_y = min(rect[1::2]) - 1
                 max_x = max(rect[::2]) - 1
@@ -173,8 +177,12 @@ class TextDataSet(object):
                     tindex = len(boxes)
                     boxes.append(box)
                     seg_areas.append(area)
-                    polygons.append(loc[0, :])
-                    segmentations.append([[loc[0][0], loc[0][1], loc[0][2], loc[0][3], loc[0][4], loc[0][5], loc[0][6], loc[0][7]]])
+                    if self.name == 'totaltext_train':
+                        polygons.append((list(loc[0])*4)[:8])
+                        segmentations.append([loc[0]])
+                    else:
+                        polygons.append(loc[0, :])
+                        segmentations.append([[loc[0][0], loc[0][1], loc[0][2], loc[0][3], loc[0][4], loc[0][5], loc[0][6], loc[0][7]]])
                     words.append(strs)
                     if loc.shape[0] == 1 :
                         charbbs = np.zeros((0, 10), dtype=np.float32)
@@ -271,4 +279,3 @@ class TextDataSet(object):
 
 
     
-

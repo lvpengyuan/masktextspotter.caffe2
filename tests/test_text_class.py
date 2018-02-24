@@ -67,11 +67,11 @@ def parse_args():
 
 
 def random_color():
-	r = random.randint(0, 255)
-	g = random.randint(0, 255)
-	b = random.randint(0, 255)
+    r = random.randint(0, 255)
+    g = random.randint(0, 255)
+    b = random.randint(0, 255)
 
-	return (r, g, b)
+    return (r, g, b)
 
 def vis_roidb(roidb):
     img_path = roidb['image']
@@ -87,26 +87,28 @@ def vis_roidb(roidb):
     for i in range(boxes.shape[0]):
         color = random_color()
         img_draw.rectangle(list(boxes[i][:4]), outline=color)
+        color = random_color()
         img_draw.polygon(list(polygons[i]), outline=color)
+        color = random_color()
         choose_cboxes = charboxes[np.where(charboxes[:, -1] == i)[0], :]
         for j in range(choose_cboxes.shape[0]):
             img_draw.polygon(list(choose_cboxes[j][:8]), outline=color)
             char = lex[int(choose_cboxes[j][8])]
             img_draw.text(list(choose_cboxes[j][:2]), char)
 
-    img.save('./tests/vis_dataset_icdar/' + img_path.strip().split('/')[-1])
+    img.save('./tests/vis_dataset_total/' + img_path.strip().split('/')[-1])
 
-	
+    
 
 
 def main(opts):
     logger = logging.getLogger(__name__)
-    ## test combined_roidb_for_training
+    # # test combined_roidb_for_training
     # roidb = combined_roidb_for_training(
     #     cfg.TRAIN.DATASETS, cfg.TRAIN.PROPOSAL_FILES)
     # for i in range(50):
-    # 	entry = roidb[random.randint(0, len(roidb))]
-    # 	vis_roidb(entry)
+    #   entry = roidb[random.randint(0, len(roidb))]
+    #   vis_roidb(entry)
     ## test
     roidbs = mix_roidbs_for_training(
         cfg.TRAIN.DATASETS, cfg.TRAIN.PROPOSAL_FILES, cfg.TRAIN.USE_CHARANNS)

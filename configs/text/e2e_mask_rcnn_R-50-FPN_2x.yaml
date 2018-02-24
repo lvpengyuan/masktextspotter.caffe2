@@ -144,5 +144,35 @@ TEST:
   RPN_PRE_NMS_TOP_N: 1000  # Per FPN level
   RPN_POST_NMS_TOP_N: 1000
   VIS: True
+  BBOX_AUG:
+    ENABLED: True
+    SCORE_HEUR: UNION  # AVG NOTE: cannot use AVG for e2e model
+    COORD_HEUR: UNION  # AVG NOTE: cannot use AVG for e2e model
+    H_FLIP: False
+    SCALES: (600, 800, 1000, 1200)
+    # SCALES: (800,)
+    MAX_SIZE: 2000
+    SCALE_H_FLIP: False
+    SCALE_SIZE_DEP: False
+    AREA_TH_LO: 2500   # 50^2
+    AREA_TH_HI: 32400  # 180^2
+    ASPECT_RATIOS: ()
+    ASPECT_RATIO_H_FLIP: False
+  MASK_AUG:
+    ENABLED: True
+    HEUR: SOFT_AVG
+    H_FLIP: False
+    SCALES: (600, 800, 1000, 1200)
+    MAX_SIZE: 2000
+    SCALE_H_FLIP: False
+    SCALE_SIZE_DEP: False
+    AREA_TH: 32400  # 180^2
+    ASPECT_RATIOS: ()
+    ASPECT_RATIO_H_FLIP: False
+  BBOX_VOTE:
+    ENABLED: True
+    VOTE_TH: 0.9
+  SOFT_NMS:
+    ENABLED: False
 OUTPUT_DIR: .
 
