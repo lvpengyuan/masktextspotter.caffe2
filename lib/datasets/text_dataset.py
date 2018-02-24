@@ -185,7 +185,7 @@ class TextDataSet(object):
                     if loc.shape[0] > 1:
                         charbbs[:, :8] = loc[1:, :]
                         valid = self.check_charbbs(charbbs)
-                        print(valid)
+                        # print(valid)
                         charbbs = charbbs[valid]
                         charbbs[:, 8] = np.array(c_class)[valid]
                         charbbs[:, 9] = tindex

@@ -81,7 +81,7 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
     if cfg.MODEL.MASK_ON and boxes.shape[0] > 0:
         timers['im_detect_mask'].tic()
         if cfg.TEST.MASK_AUG.ENABLED:
-            global_masks, char_masks = im_detect_mask_aug(model, im, boxes)
+            global_masks, char_masks, char_boxes = im_detect_mask_aug(model, im, boxes)
         else:
             global_masks, char_masks, char_boxes = im_detect_mask(model, im_scales, boxes)
         timers['im_detect_mask'].toc()
@@ -495,53 +495,62 @@ def im_detect_mask_aug(model, im, boxes):
     # Collect masks computed under different transformations
     global_masks_ts = []
     char_masks_ts = []
+    char_boxes_ts = []
 
     # Compute masks for the original image (identity transform)
     im_scales_i = im_conv_body_only(model, im)
-    global_masks_i, char_masks_i = im_detect_mask(model, im_scales_i, boxes)
+    global_masks_i, char_masks_i, char_boxes_i = im_detect_mask(model, im_scales_i, boxes)
     global_masks_ts.append(global_masks_i)
     char_masks_ts.append(char_masks_i)
+    char_boxes_ts.append(char_boxes_i)
 
     # Perform mask detection on the horizontally flipped image
     if cfg.TEST.MASK_AUG.H_FLIP:
-        global_masks_hf, char_masks_hf = im_detect_mask_hflip(model, im, boxes)
+        global_masks_hf, char_masks_hf, char_boxes_hf = im_detect_mask_hflip(model, im, boxes)
         global_masks_ts.append(global_masks_hf)
         char_masks_ts.append(char_masks_hf)
+        char_boxes_ts.append(char_boxes_hf)
 
     # Compute detections at different scales
     for scale in cfg.TEST.MASK_AUG.SCALES:
         max_size = cfg.TEST.MASK_AUG.MAX_SIZE
-        global_masks_scl, char_masks_scl = im_detect_mask_scale(model, im, scale, max_size, boxes)
+        global_masks_scl, char_masks_scl, char_boxes_scl = im_detect_mask_scale(model, im, scale, max_size, boxes)
         global_masks_ts.append(global_masks_scl)
         char_masks_ts.append(char_masks_scl)
+        char_boxes_ts.append(char_boxes_scl)
 
         if cfg.TEST.MASK_AUG.SCALE_H_FLIP:
-            global_masks_scl_hf, char_masks_scl_hf = im_detect_mask_scale(
+            global_masks_scl_hf, char_masks_scl_hf, char_boxes_scl_hf = im_detect_mask_scale(
                 model, im, scale, max_size, boxes, hflip=True
             )
             global_masks_ts.append(global_masks_scl_hf)
             char_masks_ts.append(char_masks_scl_hf)
+            char_boxes_ts.append(char_boxes_scl_hf)
 
     # Compute masks at different aspect ratios
     for aspect_ratio in cfg.TEST.MASK_AUG.ASPECT_RATIOS:
-        global_masks_ar, char_masks_ar = im_detect_mask_aspect_ratio(model, im, aspect_ratio, boxes)
+        global_masks_ar, char_masks_ar, char_boxes_ar = im_detect_mask_aspect_ratio(model, im, aspect_ratio, boxes)
         global_masks_ts.append(global_masks_ar)
         char_masks_ts.append(char_masks_ar)
+        char_boxes_ts.append(char_boxes_ar)
 
         if cfg.TEST.MASK_AUG.ASPECT_RATIO_H_FLIP:
-            global_masks_ar_hf, char_masks_ar_hf = im_detect_mask_aspect_ratio(
+            global_masks_ar_hf, char_masks_ar_hf, char_boxes_ar_hf = im_detect_mask_aspect_ratio(
                 model, im, aspect_ratio, boxes, hflip=True
             )
             global_masks_ts.append(global_masks_ar_hf)
             char_masks_ts.append(char_masks_ar_hf)
+            char_boxes_ts.append(char_boxes_ar_hf)
 
     # Combine the predicted soft masks
     if cfg.TEST.MASK_AUG.HEUR == 'SOFT_AVG':
         global_masks_c = np.mean(global_masks_ts, axis=0)
         char_masks_c = np.mean(char_masks_ts, axis=0)
+        char_boxes_c = np.mean(char_boxes_ts, axis=0)
     elif cfg.TEST.MASK_AUG.HEUR == 'SOFT_MAX':
         global_masks_c = np.amax(global_masks_ts, axis=0)
         char_masks_c = np.amax(char_masks_ts, axis=0)
+        char_boxes_c = np.amax(char_boxes_ts, axis=0)
     elif cfg.TEST.MASK_AUG.HEUR == 'LOGIT_AVG':
 
         def logit(y):
@@ -554,12 +563,16 @@ def im_detect_mask_aug(model, im, boxes):
         char_logit_masks = [logit(y) for y in char_masks_ts]
         char_logit_masks = np.mean(char_logit_masks, axis=0)
         char_masks_c = 1.0 / (1.0 + np.exp(-char_logit_masks))
+
+        char_logit_boxes = [logit(y) for y in char_boxes_ts]
+        char_logit_boxes = np.mean(char_logit_boxes, axis=0)
+        char_boxes_c = 1.0 / (1.0 + np.exp(-char_logit_boxes))
     else:
         raise NotImplementedError(
             'Heuristic {} not supported'.format(cfg.TEST.MASK_AUG.HEUR)
         )
 
-    return global_masks_c, char_masks_c
+    return global_masks_c, char_masks_c, char_boxes_c
 
 
 def im_detect_mask_hflip(model, im, boxes):
@@ -571,13 +584,14 @@ def im_detect_mask_hflip(model, im, boxes):
     boxes_hf = box_utils.flip_boxes(boxes, im.shape[1])
 
     im_scales = im_conv_body_only(model, im_hf)
-    global_masks_hf, char_masks_hf = im_detect_mask(model, im_scales, boxes_hf)
+    global_masks_hf, char_masks_hf, char_boxes_hf = im_detect_mask(model, im_scales, boxes_hf)
 
     # Invert the predicted soft masks
     global_masks_inv = global_masks_hf[:, :, :, ::-1]
     char_masks_inv = char_masks_hf[:, :, :, ::-1]
+    char_boxes_inv = char_boxes_hf[:, :, :, ::-1]
 
-    return global_masks_inv, char_masks_inv
+    return global_masks_inv, char_masks_inv, char_boxes_inv
 
 
 def im_detect_mask_scale(model, im, scale, max_size, boxes, hflip=False):
@@ -592,16 +606,16 @@ def im_detect_mask_scale(model, im, scale, max_size, boxes, hflip=False):
     cfg.TEST.MAX_SIZE = max_size
 
     if hflip:
-        global_masks_scl, char_masks_scl = im_detect_mask_hflip(model, im, boxes)
+        global_masks_scl, char_masks_scl, char_boxes_scl = im_detect_mask_hflip(model, im, boxes)
     else:
         im_scales = im_conv_body_only(model, im)
-        global_masks_scl, char_masks_scl = im_detect_mask(model, im_scales, boxes)
+        global_masks_scl, char_masks_scl, char_boxes_scl = im_detect_mask(model, im_scales, boxes)
 
     # Restore the original scale
     cfg.TEST.SCALES = orig_scales
     cfg.TEST.MAX_SIZE = orig_max_size
 
-    return global_masks_scl, char_masks_scl
+    return global_masks_scl, char_masks_scl, char_boxes_scl
 
 
 def im_detect_mask_aspect_ratio(model, im, aspect_ratio, boxes, hflip=False):
@@ -612,12 +626,12 @@ def im_detect_mask_aspect_ratio(model, im, aspect_ratio, boxes, hflip=False):
     boxes_ar = box_utils.aspect_ratio(boxes, aspect_ratio)
 
     if hflip:
-        global_masks_ar, char_masks_ar = im_detect_mask_hflip(model, im_ar, boxes_ar)
+        global_masks_ar, char_masks_ar, char_boxes_ar = im_detect_mask_hflip(model, im_ar, boxes_ar)
     else:
         im_scales = im_conv_body_only(model, im_ar)
-        global_masks_ar, char_masks_ar = im_detect_mask(model, im_scales, boxes_ar)
+        global_masks_ar, char_masks_ar, char_boxes_ar = im_detect_mask(model, im_scales, boxes_ar)
 
-    return global_masks_ar, char_masks_ar
+    return global_masks_ar, char_masks_ar, char_boxes_ar
 
 
 def im_detect_keypoints(model, im_scales, boxes):
