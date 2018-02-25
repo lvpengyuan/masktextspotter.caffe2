@@ -178,8 +178,8 @@ class TextDataSet(object):
                     boxes.append(box)
                     seg_areas.append(area)
                     if self.name == 'totaltext_train':
-                        polygons.append((list(loc[0])*4)[:8])
-                        segmentations.append([loc[0]])
+                        polygons.append(np.array((list(loc[0])*4)[:8]))
+                        segmentations.append([list(loc[0])])
                     else:
                         polygons.append(loc[0, :])
                         segmentations.append([[loc[0][0], loc[0][1], loc[0][2], loc[0][3], loc[0][4], loc[0][5], loc[0][6], loc[0][7]]])

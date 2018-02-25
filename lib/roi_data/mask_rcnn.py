@@ -122,6 +122,11 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
     if DEBUG:
         img_path = roidb['image']
         img = Image.open(img_path)
+        # img = blobs['data'][0]
+        # img = img.transpose((1,2,0))
+        # img  += cfg.PIXEL_MEANS
+        # img = img.astype(np.int8)
+        # img = Image.fromarray(img)
 
     if is_e2e:
         fg_inds = np.where(blobs['labels_int32'] > 0)[0]

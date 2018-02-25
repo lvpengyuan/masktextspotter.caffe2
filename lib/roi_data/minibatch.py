@@ -152,7 +152,6 @@ def _get_image_aug_blob(roidb):
     processed_roidb = []
     for i in range(num_images):
         roi_rec = roidb[i]
-        # name = roidb[i]['image'].split('/')[-1]
         im = cv2.imread(roidb[i]['image'])
         if roidb[i]['flipped']:
             im = im[:, ::-1, :]
@@ -161,7 +160,7 @@ def _get_image_aug_blob(roidb):
         
         new_rec = roi_rec.copy()
         boxes = roi_rec['boxes'].copy()
-        polygons = roi_rec['polygons'].copy()
+        polygons = roi_rec['segms']
         charboxes = roi_rec['charboxes'].copy()
         segms = roi_rec['segms']
 
@@ -186,10 +185,10 @@ def _get_image_aug_blob(roidb):
         new_rec['width'] = im_info_width
         im_info = [im_info_height, im_info_width, im_scale]
         new_rec['boxes'] = boxes
-        new_rec['polygons'] = polygons
-        for j, polygon in enumerate(new_rec['polygons']):
-            segms[j] = [[polygon[0], polygon[1], polygon[2], polygon[3], polygon[4], polygon[5], polygon[6], polygon[7]]]
-        new_rec['segms'] = segms
+        # new_rec['polygons'] = polygons
+        # for j, polygon in enumerate(new_rec['polygons']):
+        #     segms[j] = [[polygon[0], polygon[1], polygon[2], polygon[3], polygon[4], polygon[5], polygon[6], polygon[7]]]
+        new_rec['segms'] = polygons
         new_rec['charboxes'] = charboxes
         new_rec['im_info'] = im_info
         processed_roidb.append(new_rec)
@@ -205,8 +204,12 @@ def _get_image_aug_blob(roidb):
         # new_rec['im_info'] = im_info
         # processed_roidb.append(new_rec)
         # im_scales.append(1.0)
-
-        # _visualize_roidb(im, new_rec['boxes'], new_rec['polygons'], new_rec['charboxes'], name)
+        # polygons_scale = []
+        # for polygon in polygons:
+        #     polygon_scale = list(np.array(polygon[0])*im_scale)
+        #     polygons_scale.append([polygon_scale])
+        # name = roidb[i]['image'].split('/')[-1]
+        # _visualize_roidb(im, np.round(boxes.copy() * im_scale), polygons_scale, charboxes*im_scale, name)
 
     # Create a blob to hold the input images
     blob = blob_utils.im_list_to_blob(processed_ims)
@@ -265,7 +268,7 @@ def _rotate_image(im, boxes, polygons, charboxes):
         delta = 10
         prob = 1
     new_boxes = boxes.copy()
-    new_polygons = polygons.copy()
+    new_polygons = polygons
     new_charboxes = charboxes.copy()
     if random.random() < prob:
         delta = random.uniform(-1*delta, delta)
@@ -285,8 +288,8 @@ def _rotate_image(im, boxes, polygons, charboxes):
         ## get new boxes, polygons, charboxes
         boxes[:, 0::2] += start_w
         boxes[:, 1::2] += start_h
-        polygons[:, ::2] += start_w
-        polygons[:, 1::2] += start_h
+        # polygons[:, ::2] += start_w
+        # polygons[:, 1::2] += start_h
         charboxes[:, :8:2] += start_w
         charboxes[:, 1:8:2] += start_h
 
@@ -297,7 +300,8 @@ def _rotate_image(im, boxes, polygons, charboxes):
         ## gt
         new_boxes[:, :4] = _quad2minrect(_rotate_polygons(_rect2quad(boxes), -1*delta, (r_width/2, r_height/2)))
         ## polygons
-        new_polygons = _rotate_polygons(polygons, -1*delta, (r_width/2, r_height/2))
+        # new_polygons = _rotate_polygons(polygons, -1*delta, (r_width/2, r_height/2))
+        new_polygons = _rotate_segms(polygons, -1*delta, (r_width/2, r_height/2), start_h, start_w)
         ## charboxes
         if charboxes[:, -1].mean() != -1:
             new_charboxes[:, :8] = _rotate_polygons(charboxes[:, :8], -1*delta, (r_width/2, r_height/2))
@@ -320,6 +324,37 @@ def _rotate_polygons(polygons, angle, r_c):
         # assert(len(list(rbox.exterior.coords))>=5)
         rotate_boxes_list.append(rbox.boundary.coords[:-1])
     res = _boxlist2quads(rotate_boxes_list)
+    return res
+
+def _rotate_segms(polygons, angle, r_c, start_h, start_w):
+    ## polygons: N*8
+    ## r_x: rotate center x
+    ## r_y: rotate center y
+    ## angle: -15~15
+    poly_list=[]
+    for polygon in polygons:
+        tmp=[]
+        for i in range(int(len(polygon[0]) / 2)):
+            tmp.append([polygon[0][2*i] + start_w, polygon[0][2*i+1] + start_h])
+        poly_list.append(tmp)
+
+    rotate_boxes_list = []
+    for poly in poly_list:
+        box = Polygon(poly)
+        rbox = affinity.rotate(box, angle, r_c)
+        if len(list(rbox.exterior.coords))<5:
+            print(poly)
+            print(rbox)
+        # assert(len(list(rbox.exterior.coords))>=5)
+        rotate_boxes_list.append(rbox.boundary.coords[:-1])
+    res = []
+    for i, box in enumerate(rotate_boxes_list):
+        tmp = []
+        for point in box:
+            tmp.append(point[0])
+            tmp.append(point[1])
+        res.append([tmp])
+
     return res
 
 def _random_saturation(im):
@@ -429,12 +464,12 @@ def _visualize_roidb(im, boxes, polygons, charboxes, name):
     for i in range(boxes.shape[0]):
         color = _random_color()
         img_draw.rectangle(list(boxes[i][:4]), outline=color)
-        img_draw.polygon(list(polygons[i]), outline=color)
+        img_draw.polygon(polygons[i][0], outline=color)
         choose_cboxes = charboxes[np.where(charboxes[:, -1] == i)[0], :]
         for j in range(choose_cboxes.shape[0]):
             img_draw.polygon(list(choose_cboxes[j][:8]), outline=color)
-            char = lex[int(choose_cboxes[j][8])]
-            img_draw.text(list(choose_cboxes[j][:2]), char)
+            # char = lex[int(choose_cboxes[j][8])]
+            # img_draw.text(list(choose_cboxes[j][:2]), char)
 
     img.save('./tests/visu_data_aug/' + name)
     print('image saved')
