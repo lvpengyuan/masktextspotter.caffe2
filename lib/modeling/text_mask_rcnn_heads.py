@@ -128,7 +128,7 @@ def add_mask_rcnn_losses(model, blob_mask):
         scale=1. / cfg.NUM_GPUS * cfg.MRCNN.WEIGHT_LOSS_MASK
     )
     mask_cls_prob, loss_char_mask = model.net.SpatialSoftmaxWithLoss(
-        [blob_mask[1], 'masks_char_int32'],
+        [blob_mask[1], 'masks_char_int32', 'masks_char_weight'],
         ['mask_cls_prob', 'loss_char_mask'],
         scale=1. / cfg.NUM_GPUS * cfg.MRCNN.WEIGHT_LOSS_MASK
     )

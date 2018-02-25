@@ -5,22 +5,24 @@ MODEL:
   FASTER_RCNN: True
   MASK_ON: True
   NAME: east_weight_wh_finetune_all
-NUM_GPUS: 6
+NUM_GPUS: 1
 SOLVER:
-  # WEIGHT_DECAY: 0.0001
-  # LR_POLICY: steps_with_decay
-  # # BASE_LR: 0.0001  #icdar13 
-  # BASE_LR: 0.005   #synth
-  # GAMMA: 0.1
-  # MAX_ITER: 200000
-  # STEPS: [0, 120000, 160000]
   WEIGHT_DECAY: 0.0001
   LR_POLICY: steps_with_decay
   # BASE_LR: 0.0001  #icdar13 
-  BASE_LR: 0.001   #synth
+  BASE_LR: 0.005   #synth
   GAMMA: 0.1
-  MAX_ITER: 100000
-  STEPS: [0, 40000]
+  MAX_ITER: 200000
+  STEPS: [0, 120000, 160000]
+
+
+  # WEIGHT_DECAY: 0.0001
+  # LR_POLICY: steps_with_decay
+  # # BASE_LR: 0.0001  #icdar13 
+  # BASE_LR: 0.001   #synth
+  # GAMMA: 0.1
+  # MAX_ITER: 100000
+  # STEPS: [0, 40000]
 FPN:
   FPN_ON: True
   MULTILEVEL_ROIS: True
@@ -46,7 +48,7 @@ MRCNN:
   DILATION: 1  # default 2
   CONV_INIT: MSRAFill  # default GaussianFill
   IS_E2E: True
-  MASK_BATCH_SIZE_PER_IM: 128
+  MASK_BATCH_SIZE_PER_IM: 16
   WEIGHT_LOSS_MASK: 1.0
   WEIGHT_LOSS_CHAR_BOX: 1.0
   WEIGHT_WH: True  ## default is false 
@@ -58,17 +60,17 @@ TRAIN:
   SNAPSHOT_ITERS: 10000
 
   ##################### pre-train on synth ##########################
-  # WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
+  WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
   # DATASETS: ('synth_train', )
-  # # DATASETS: ('icdar2013_train', )
-  # SCALES: (800,)
-  # MAX_SIZE: 1333
-  # IMS_PER_BATCH: 2
-  # ASPECT_GROUPING: True
-  # MIX_TRAIN: False
+  DATASETS: ('icdar2013_train', )
+  SCALES: (800,)
+  MAX_SIZE: 1333
+  IMS_PER_BATCH: 2
+  ASPECT_GROUPING: True
+  MIX_TRAIN: False
   ######################  Fine tune   #################################
-  MIX_TRAIN: True
-  WEIGHTS: ./train/synth_train/generalized_rcnn/east_weight_wh/model_iter179999.pkl
+  # MIX_TRAIN: True
+  # WEIGHTS: ./train/synth_train/generalized_rcnn/east_weight_wh/model_iter179999.pkl
   # WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
   # DATASETS: ('synth_train', )
   # # DATASETS: ('icdar2013_train', )
@@ -101,17 +103,17 @@ TRAIN:
   # # MIX_RATIOS: [0.5, 0.5]
   # # # the ratios of synth, icdar2013, icdar2015 is 2:1:1, defaultly
 
-  DATASETS: ('totaltext_train', 'scut-eng-char_train', 'synth_train', 'icdar2013_train', 'icdar2015_train')
-  USE_CHARANNS: [False, True, True, True, False]
-  # the ratios of synth, icdar2013, icdar2015 is 2:1:1, defaultly
-  # MIX_RATIOS: [0.125, 0.125, 0.5, 0.125, 0.125]
-  MIX_RATIOS: [1.0 / 6, 1.0 / 6, 1.0 / 3, 1.0 / 6, 1.0 / 6]
-  SCALES: (600, 800, 1000)
-  MAX_SIZE: 1333
-  # # SCALES: (800,)
-  # # MAX_SIZE: 1333
-  IMS_PER_BATCH: 1
-  ASPECT_GROUPING: False
+  # DATASETS: ('totaltext_train', 'scut-eng-char_train', 'synth_train', 'icdar2013_train', 'icdar2015_train')
+  # USE_CHARANNS: [False, True, True, True, False]
+  # # the ratios of synth, icdar2013, icdar2015 is 2:1:1, defaultly
+  # # MIX_RATIOS: [0.125, 0.125, 0.5, 0.125, 0.125]
+  # MIX_RATIOS: [1.0 / 6, 1.0 / 6, 1.0 / 3, 1.0 / 6, 1.0 / 6]
+  # SCALES: (600, 800, 1000)
+  # MAX_SIZE: 1333
+  # # # SCALES: (800,)
+  # # # MAX_SIZE: 1333
+  # IMS_PER_BATCH: 1
+  # ASPECT_GROUPING: False
 
 IMAGE:
   aug: True

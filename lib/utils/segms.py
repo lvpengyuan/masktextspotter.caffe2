@@ -117,13 +117,14 @@ def polys_to_mask_wrt_box(polygons, box, M):
     mask = np.array(mask > 0, dtype=np.float32)
     return mask
 
-def polys_to_mask_wrt_box_rec(rec_rois_gt_chars, polygon, box, M_HEIGHT, M_WIDTH, shrink = 0.25, weight_wh=False):
+def polys_to_mask_wrt_box_rec(rec_rois_gt_chars, polygon, box, M_HEIGHT, M_WIDTH, shrink = 0.5, weight_wh=False):
     """Convert from the COCO polygon segmentation format to a binary mask
     encoded as a 2D array of data type numpy.float32. The polygon segmentation
     is understood to be enclosed in the given box and rasterized to an M x M
     mask. The resulting mask is therefore of shape (M, M).
     """
     char_map = np.zeros((2, M_HEIGHT, M_WIDTH), dtype=np.float32)
+    char_weight = np.ones((M_HEIGHT, M_WIDTH), dtype=np.float32)
     char_box = np.zeros((M_HEIGHT, M_WIDTH, 4), dtype=np.float32)
     char_box_inside_weight = np.zeros((M_HEIGHT, M_WIDTH, 4), dtype=np.float32)
     # char_map_weight = np.zeros((2, M_HEIGHT, M_WIDTH), dtype=np.float32)
@@ -141,29 +142,37 @@ def polys_to_mask_wrt_box_rec(rec_rois_gt_chars, polygon, box, M_HEIGHT, M_WIDTH
     polygon_norm[1::2] = (polygon_norm[1::2] - ymin) * M_HEIGHT / h
     polygon_reshape = polygon_norm.reshape((-1, 2)).astype(np.int32)
     cv2.fillPoly(char_map[0,:,:], [polygon_reshape], 1)
-    # char_map_weight[0,:,:] = np.ones((M_HEIGHT, M_WIDTH))
 
     if rec_rois_gt_chars.size > 0:
         rec_rois_gt_chars[0,:,0:8:2] = (rec_rois_gt_chars[0,:,0:8:2] - xmin) * M_WIDTH / w
         rec_rois_gt_chars[0,:,1:8:2] = (rec_rois_gt_chars[0,:,1:8:2] - ymin) * M_HEIGHT / h
+        x_center = np.mean(rec_rois_gt_chars[0,:,0:8:2], axis = 1).astype(np.int32)
+        y_center = np.mean(rec_rois_gt_chars[0,:,1:8:2], axis = 1).astype(np.int32)
         for i in range(rec_rois_gt_chars.shape[1]):  
-            gt_poly = rec_rois_gt_chars[0,i,:8]
-            box_xmin = max(0,min(gt_poly[0:8:2]))
-            box_xmax = min(M_WIDTH - 1, max(gt_poly[0:8:2]))
-            box_ymin = max(0,min(gt_poly[1:8:2]))
-            box_ymax = min(M_HEIGHT - 1, max(gt_poly[1:8:2]))
-            gt_poly_reshape = gt_poly.reshape((4, 2))
-            char_cls = int(rec_rois_gt_chars[0,i,8])
-            if shrink>0:
-                npoly = _shrink_poly(gt_poly_reshape, shrink)
-            else:
-                npoly = gt_poly_reshape
-            poly = npoly.astype(np.int32)
-            box_xmin_shrink = max(0, min(poly[:,0]))
-            box_xmax_shrink = min(M_WIDTH - 1, max(poly[:,0]))
-            box_ymin_shrink = max(0, min(poly[:,1]))
-            box_ymax_shrink = min(M_HEIGHT - 1, max(poly[:,1]))
-            if box_xmax_shrink - box_xmin_shrink>0 and box_ymax_shrink - box_ymin_shrink>0:
+            if x_center[i]>=0 and x_center[i]<M_WIDTH and y_center[i]>=0 and y_center[i]<M_HEIGHT:
+                gt_poly = rec_rois_gt_chars[0,i,:8]
+                box_xmin = max(0,min(gt_poly[0:8:2]))
+                box_xmax = min(M_WIDTH - 1, max(gt_poly[0:8:2]))
+                box_ymin = max(0,min(gt_poly[1:8:2]))
+                box_ymax = min(M_HEIGHT - 1, max(gt_poly[1:8:2]))
+                gt_poly_reshape = gt_poly.reshape((4, 2))
+                char_cls = int(rec_rois_gt_chars[0,i,8])
+                if shrink>0:
+                    # rpoly = _shrink_poly(gt_poly_reshape.copy(), shrink) ## shrink for regression
+                    # spoly = _shrink_poly(gt_poly_reshape.copy(), shrink*1.5) ## shrink for classification
+                    rpoly = _shrink_rect(gt_poly_reshape.copy(), shrink) ## shrink for regression
+                    spoly = _shrink_rect(gt_poly_reshape.copy(), shrink/2) ## shrink for classification
+                    # print('gt_poly_reshape', gt_poly_reshape)
+                    # print('spoly', spoly)
+                else:
+                    rpoly = gt_poly_reshape.copy()
+                    spoly = gt_poly_reshape.copy()
+                rpoly = rpoly.astype(np.int32)
+                box_xmin_shrink = max(0, min(rpoly[:,0]))
+                box_xmax_shrink = min(M_WIDTH - 1, max(rpoly[:,0]))
+                box_ymin_shrink = max(0, min(rpoly[:,1]))
+                box_ymax_shrink = min(M_HEIGHT - 1, max(rpoly[:,1]))
+            
                 if weight_wh:
                     char_box_inside_weight[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 0] = 1.0
                     char_box_inside_weight[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 1] = (box_ymax - box_ymin)*1.0/(box_xmax - box_xmin)
@@ -184,21 +193,33 @@ def polys_to_mask_wrt_box_rec(rec_rois_gt_chars, polygon, box, M_HEIGHT, M_WIDTH
                     char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 1] = np.reshape((box_xmax - index[1]) / float(M_WIDTH), (box_ymax_shrink - box_ymin_shrink, box_xmax_shrink - box_xmin_shrink))
                     char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 2] = np.reshape((box_ymax - index[0]) / float(M_HEIGHT), (box_ymax_shrink - box_ymin_shrink, box_xmax_shrink - box_xmin_shrink))
                     char_box[box_ymin_shrink:box_ymax_shrink, box_xmin_shrink:box_xmax_shrink, 3] = np.reshape((index[1] - box_xmin) / float(M_WIDTH), (box_ymax_shrink - box_ymin_shrink, box_xmax_shrink - box_xmin_shrink))
-                # for i in range(box_ymin_shrink, box_ymax_shrink):
-                #     for j in range(box_xmin_shrink, box_xmax_shrink):
-                #         # top, right, bottom, left
-                #         char_box[i,j,0] = (i - box_ymin) / float(M_HEIGHT)
-                #         char_box[i,j,1] = (box_xmax - j) / float(M_WIDTH)
-                #         char_box[i,j,2] = (box_ymax - i) / float(M_HEIGHT)
-                #         char_box[i,j,3] = (j - box_xmin) / float(M_WIDTH)
-                map_tmp = np.zeros((M_HEIGHT, M_WIDTH))
-                cv2.fillPoly(char_map[1,:,:], [poly], char_cls)
-            # else:
-                # print("warning: character too small")
-    else:
+                
+                ## get classification target
+                spoly = spoly.astype(np.int32)
+                sbox_xmin_shrink = max(0, min(spoly[:,0]))
+                sbox_xmax_shrink = min(M_WIDTH - 1, max(spoly[:,0]))
+                sbox_ymin_shrink = max(0, min(spoly[:,1]))
+                sbox_ymax_shrink = min(M_HEIGHT - 1, max(spoly[:,1]))
+
+                ## very small char box
+                if sbox_xmax_shrink == sbox_xmin_shrink:
+                    sbox_xmax_shrink = sbox_xmin_shrink + 1
+                if sbox_ymax_shrink == sbox_ymin_shrink:
+                    sbox_ymax_shrink = sbox_ymin_shrink + 1
+
+                char_map[1, sbox_ymin_shrink:sbox_ymax_shrink, sbox_xmin_shrink:sbox_xmax_shrink] = char_cls
+
+        ## char_weight 
+        pos_index = np.where(char_map[1, :, :] > 0)
+        pos_num = pos_index[0].size
+        if pos_num > 0:
+            pos_weight = (M_WIDTH*M_HEIGHT - pos_num)/pos_num
+            char_weight[pos_index] = pos_weight
+    else: ## for samples without char ann
         char_map[1, :, :].fill(-1)
 
-    return char_map, char_box, char_box_inside_weight
+
+    return char_map, char_weight, char_box, char_box_inside_weight
 
 
 def polys_to_boxes(polys):
@@ -350,6 +371,22 @@ def rle_masks_to_boxes(masks):
         boxes[i, :] = (x0, y0, x1, y1)
 
     return boxes, np.where(keep)[0]
+
+def _shrink_rect(poly, shrink):
+    xmin = min(poly[:,0])
+    xmax = max(poly[:,0])
+    ymin = min(poly[:,1])
+    ymax = max(poly[:,1])
+    assert xmax > xmin and ymax > ymin
+    xc = (xmax + xmin) / 2
+    yc = (ymax + ymin) / 2
+    w = xmax - xmin
+    h = ymax - ymin
+    sxmin = xc - w/2*shrink
+    sxmax = xc + w/2*shrink
+    symin = yc - h/2*shrink
+    symax = yc + h/2*shrink
+    return np.array([sxmin, symin, sxmax, symin, sxmax, symax, sxmin, symax]).reshape((4, 2))
 
 def _shrink_poly(poly, shrink):
     # shrink ratio

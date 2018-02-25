@@ -69,6 +69,7 @@ def get_fast_rcnn_blob_names(is_training=True):
         # mask size.
         blob_names += ['masks_global_int32']
         blob_names += ['masks_char_int32']
+        blob_names += ['masks_char_weight']
 
         blob_names += ['char_bbox_targets']
         blob_names += ['char_bbox_inside_weights']

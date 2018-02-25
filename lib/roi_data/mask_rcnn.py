@@ -142,6 +142,7 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
             # Class labels for the foreground rois
             mask_class_labels = blobs['labels_int32'][fg_inds]
             masks = blob_utils.zeros((fg_inds.shape[0], 2, M_HEIGHT*M_WIDTH), int32=True)
+            mask_weights = np.zeros((fg_inds.shape[0], M_HEIGHT*M_WIDTH), dtype=np.float32)
             char_boxes = np.zeros((fg_inds.shape[0], M_HEIGHT*M_WIDTH, 4), dtype=np.float32)
             char_boxes_inside_weight = np.zeros((fg_inds.shape[0], M_HEIGHT*M_WIDTH, 4), dtype=np.float32)
             char_boxes_outside_weight = np.zeros((fg_inds.shape[0], M_HEIGHT*M_WIDTH, 4), dtype=np.float32)
@@ -167,7 +168,7 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
                 roi_fg = rois_fg[i]
                 # Rasterize the portion of the polygon mask within the given fg roi
                 # to an M_HEIGHT x M_WIDTH binary image
-                mask, char_box, char_box_inside_weight = segm_utils.polys_to_mask_wrt_box_rec(chars_gt, poly_gt, roi_fg, M_HEIGHT, M_WIDTH, weight_wh=cfg.MRCNN.WEIGHT_WH)
+                mask, mask_weight, char_box, char_box_inside_weight = segm_utils.polys_to_mask_wrt_box_rec(chars_gt.copy(), poly_gt, roi_fg.copy(), M_HEIGHT, M_WIDTH, weight_wh=cfg.MRCNN.WEIGHT_WH)
                 if DEBUG:
                     draw = ImageDraw.Draw(img)
                     draw.rectangle([(roi_fg[0],roi_fg[1]), (roi_fg[2],roi_fg[3])])
@@ -177,10 +178,11 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
                     _visu_char_map(mask[1,:,:].copy(), './tests/proposals_visu_char.jpg')
                     _visu_char_box(char_box, char_box_inside_weight, './tests/char_box.jpg', M_HEIGHT, M_WIDTH)
                     raw_input()
-                mask = np.array(mask, dtype=np.int32)  # Ensure it's binary
+                # mask = np.array(mask, dtype=np.int32)  # Ensure it's binary
                 # mask_weight = np.array(mask_weight, dtype=np.int32)  # Ensure it's binary
                 masks[i, 0, :] = np.reshape(mask[0,:,:], M_HEIGHT*M_WIDTH)
                 masks[i, 1, :] = np.reshape(mask[1,:,:], M_HEIGHT*M_WIDTH)
+                mask_weights[i, :] = np.reshape(mask_weight, M_HEIGHT*M_WIDTH)
                 char_boxes[i, :, :] = np.reshape(char_box, (M_HEIGHT*M_WIDTH, 4))
                 char_boxes_inside_weight[i, :, :] = np.reshape(char_box_inside_weight, (M_HEIGHT*M_WIDTH, 4))
                 # mask_weights[i, 0, :] = np.reshape(mask_weight[0,:,:], M_HEIGHT*M_WIDTH)
@@ -195,6 +197,7 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
             # We give it an -1's blob (ignore label)
             masks = -blob_utils.ones((1, 2, M_HEIGHT*M_WIDTH), int32=True)
             mask_weights = -blob_utils.ones((1, 2, M_HEIGHT*M_WIDTH), int32=True)
+            char_boxes_inside_weight = -np.ones(1, M_HEIGHT*M_WIDTH, 4, dtype=np.float32)
             # We label it with class = 0 (background)
             mask_class_labels = blob_utils.zeros((1, ))
             # Mark that the first roi has a mask
@@ -252,7 +255,7 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
             masks = -blob_utils.ones((1, 2, M_HEIGHT*M_WIDTH), int32=True)
             mask_weights = -blob_utils.ones((1, 2, M_HEIGHT*M_WIDTH), int32=True)
             char_boxes = -np.ones(1, M_HEIGHT*M_WIDTH, 4, dtype=np.int32)
-            char_boxes_inside_weight = -np.ones(1, M_HEIGHT*M_WIDTH, 4, dtype=np.float32)
+            char_boxes_inside_weight = -np.zeros(1, M_HEIGHT*M_WIDTH, 4, dtype=np.float32)
             # We label it with class = 0 (background)
             mask_class_labels = blob_utils.zeros((1, ))
             # Mark that the first roi has a mask
@@ -273,6 +276,7 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
     blobs['roi_has_mask_int32'] = roi_has_mask
     blobs['masks_global_int32'] = masks[:, 0, :]
     blobs['masks_char_int32'] = masks[:, 1, :].reshape((-1, M_HEIGHT, M_WIDTH))
+    blobs['masks_char_weight'] = mask_weights
     blobs['char_bbox_targets'] = char_boxes.reshape((-1,4))
     blobs['char_bbox_inside_weights'] = char_boxes_inside_weight.reshape((-1,4))
     blobs['char_bbox_outside_weights'] = char_boxes_outside_weight.reshape((-1,4))
@@ -309,24 +313,24 @@ def _visu_global_map(mask, save_path):
     im.save(save_path)
 
 def _visu_char_map(char_mask, save_path):
-    char_mask = char_mask*5
+    char_mask = 255 - char_mask*5
     char_mask = char_mask.astype('uint8')
     im = Image.fromarray(char_mask)
     im.save(save_path)
 
 def _visu_char_box(char_box, char_box_weight, save_path, height, width):
-    im=np.zeros((height, width, 3))
+    im=np.ones((height, width, 3))
     im = im.astype('uint8')
     im = Image.fromarray(im)
     img_draw = ImageDraw.Draw(im)
     for i in range(char_box.shape[0]):
         for j in range(char_box.shape[1]):
             if char_box[i,j,0]>0:
-                assert(char_box_weight[i,j,0]==1 and char_box_weight[i,j,1]==1 and char_box_weight[i,j,2]==1 and char_box_weight[i,j,3]==1)
+                # assert(char_box_weight[i,j,0]==1 and char_box_weight[i,j,1]==1 and char_box_weight[i,j,2]==1 and char_box_weight[i,j,3]==1)
                 ymin = int((i - char_box[i,j,0]*height))
-                xmax = int((j + char_box[i,j,1]*width))
+                xmax = int((j + char_box[i,j,1]*height))
                 ymax = int((i + char_box[i,j,2]*height))
-                xmin = int((j - char_box[i,j,3]*width))
+                xmin = int((j - char_box[i,j,3]*height))
                 box = [xmin, ymin, xmax, ymax]
                 img_draw.rectangle(box, outline=(255, 0, 0))
 
