@@ -197,7 +197,7 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
             # We give it an -1's blob (ignore label)
             masks = -blob_utils.ones((1, 2, M_HEIGHT*M_WIDTH), int32=True)
             mask_weights = -blob_utils.ones((1, 2, M_HEIGHT*M_WIDTH), int32=True)
-            char_boxes_inside_weight = -np.ones(1, M_HEIGHT*M_WIDTH, 4, dtype=np.float32)
+            char_boxes_inside_weight = np.zeros(1, M_HEIGHT*M_WIDTH, 4, dtype=np.float32)
             # We label it with class = 0 (background)
             mask_class_labels = blob_utils.zeros((1, ))
             # Mark that the first roi has a mask

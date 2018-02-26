@@ -213,7 +213,7 @@ def polys_to_mask_wrt_box_rec(rec_rois_gt_chars, polygon, box, M_HEIGHT, M_WIDTH
         pos_index = np.where(char_map[1, :, :] > 0)
         pos_num = pos_index[0].size
         if pos_num > 0:
-            pos_weight = (M_WIDTH*M_HEIGHT - pos_num)/pos_num
+            pos_weight = 1.0 * (M_WIDTH*M_HEIGHT - pos_num)/pos_num
             char_weight[pos_index] = pos_weight
     else: ## for samples without char ann
         char_map[1, :, :].fill(-1)

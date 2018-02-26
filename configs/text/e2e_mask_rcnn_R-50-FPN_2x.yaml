@@ -4,8 +4,8 @@ MODEL:
   NUM_CLASSES: 2
   FASTER_RCNN: True
   MASK_ON: True
-  NAME: east_weight_wh_finetune_all
-NUM_GPUS: 1
+  NAME: east++
+NUM_GPUS: 4
 SOLVER:
   WEIGHT_DECAY: 0.0001
   LR_POLICY: steps_with_decay
@@ -13,8 +13,7 @@ SOLVER:
   BASE_LR: 0.005   #synth
   GAMMA: 0.1
   MAX_ITER: 200000
-  STEPS: [0, 120000, 160000]
-
+  STEPS: [0, 120000]
 
   # WEIGHT_DECAY: 0.0001
   # LR_POLICY: steps_with_decay
@@ -61,8 +60,8 @@ TRAIN:
 
   ##################### pre-train on synth ##########################
   WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
-  # DATASETS: ('synth_train', )
-  DATASETS: ('icdar2013_train', )
+  DATASETS: ('synth_train', )
+  # DATASETS: ('icdar2013_train', )
   SCALES: (800,)
   MAX_SIZE: 1333
   IMS_PER_BATCH: 2
@@ -116,7 +115,7 @@ TRAIN:
   # ASPECT_GROUPING: False
 
 IMAGE:
-  aug: True
+  aug: False
   saturation_prob: 0.5
   saturation_lower: 0.5
   saturation_upper: 1.5
