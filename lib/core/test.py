@@ -44,7 +44,7 @@ import utils.blob as blob_utils
 import utils.boxes as box_utils
 import utils.image as image_utils
 import utils.keypoints as keypoint_utils
-# import lanms
+import lanms
 
 from PIL import Image, ImageDraw, ImageFont
 import os
@@ -121,7 +121,8 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
             pts = get_tight_rect(corners, box[0], box[1], im.shape[0], im.shape[1], 1)
             pts_origin = [x * 1.0 for x in pts]
             pts_origin = map(int, pts_origin)
-            text, rec_score, rec_scores, keep_charboxes = getstr(char_masks[index,:,:,:].copy(), char_boxes[index, :, :, :].copy(),  box_w, box_h, weight_wh=cfg.MRCNN.WEIGHT_WH)
+            
+            text, rec_score, rec_scores, keep_charboxes = getstr(char_masks[index,:,:,:].copy(), char_boxes[index, :, :, :].copy(),  box_w, box_h, image_name, weight_wh=cfg.MRCNN.WEIGHT_WH)
             result_log = [int(x * 1.0) for x in box[:4]] + pts_origin + [text] + [scores[index]] + [rec_score]
             result_logs.append(result_log)
             if vis:    
@@ -156,14 +157,14 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
                 os.mkdir(save_dir_visu)
             img_poly = Image.fromarray(img_poly).convert('RGB')
             img_char = Image.fromarray(img_char).convert('RGB')
-            Image.blend(img, img_poly, 0.5).save(os.path.join(save_dir_visu, str(image_name) + '_blend_poly.jpg'))
+            # Image.blend(img, img_poly, 0.5).save(os.path.join(save_dir_visu, str(image_name) + '_blend_poly.jpg'))
             Image.blend(img, img_char, 0.5).save(os.path.join(save_dir_visu, str(image_name) + '_blend_char.jpg'))
 
     format_output(save_dir_res, result_logs, image_name)
 
 
 def format_output(out_dir, boxes, img_name):
-    res = open(os.path.join(out_dir, 'res_' + img_name.split('.')[0] + '.txt'), 'a+')
+    res = open(os.path.join(out_dir, 'res_' + img_name.split('.')[0] + '.txt'), 'w')
     for box in boxes:
         box = ','.join([str(x) for x in box])
         res.write(box + '\n')
@@ -975,15 +976,17 @@ def segm_results(cls_boxes, masks, ref_boxes, im_h, im_w):
 
 
 
-def getstr(seg, charboxes, box_w, box_h, thresh_s=0.3, is_lanms=True, weight_wh=False):
+def getstr(seg, charboxes, box_w, box_h, image_name, thresh_s=0.15, is_lanms=True, weight_wh=False):
     bg_map = (1 - seg[0, :, :])
-    bg_map = cv2.GaussianBlur(bg_map, (3, 3), sigmaX=3)
+    # bg_map = cv2.GaussianBlur(bg_map, (3, 3), sigmaX=3)
     ret, thresh = cv2.threshold(bg_map, 0.15, 1, cv2.THRESH_BINARY)
     # cv2.imwrite('./bin.jpg', (thresh*255).astype(np.uint8))
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(5, 5))  
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3, 3))  
     eroded = cv2.erode(thresh,kernel)
-    # cv2.imwrite('./eroded.jpg', (eroded*255).astype(np.uint8))
-    # raw_input()
+    # if image_name=='img_10.jpg':
+    #     print('----------')
+    #     cv2.imwrite('./eroded.jpg', (eroded*255).astype(np.uint8))
+    #     raw_input()
     eroded = eroded.reshape((-1, 1))
 
     mask_index = np.argmax(seg, axis=0)
