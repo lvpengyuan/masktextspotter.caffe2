@@ -5,7 +5,7 @@ MODEL:
   FASTER_RCNN: True
   MASK_ON: True
   NAME: shrink++
-NUM_GPUS: 4
+NUM_GPUS: 1
 SOLVER:
   WEIGHT_DECAY: 0.0001
   LR_POLICY: steps_with_decay
@@ -132,7 +132,7 @@ IMAGE:
 TEST:
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune/model_final.pkl
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/east_weight_wh_finetune_aug_ms_charann/model_iter69999.pkl
-  WEIGHTS: ./train/east++/model_iter169999.pkl
+  WEIGHTS: ./train/shrink++/model_iter169999.pkl
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune_mix_aug/model_final.pkl
   # DATASETS: ('total_test',)
   DATASETS: ('icdar2013_test',)

@@ -53,6 +53,7 @@ logger = logging.getLogger(__name__)
 
 
 def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
+    print(image_name)
     if timers is None:
         timers = defaultdict(Timer)
 
@@ -114,6 +115,7 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
             if  hull is None:
                 continue
             hull=hull[::-1]
+            # print(hull)
             #find minimum area bounding box.
             rect = cv2.minAreaRect(hull)
             corners = cv2.boxPoints(rect)
@@ -121,16 +123,24 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
             pts = get_tight_rect(corners, box[0], box[1], im.shape[0], im.shape[1], 1)
             pts_origin = [x * 1.0 for x in pts]
             pts_origin = map(int, pts_origin)
-            
-            text, rec_score, rec_scores, keep_charboxes = getstr(char_masks[index,:,:,:].copy(), char_boxes[index, :, :, :].copy(),  box_w, box_h, image_name, weight_wh=cfg.MRCNN.WEIGHT_WH)
-            result_log = [int(x * 1.0) for x in box[:4]] + pts_origin + [text] + [scores[index]] + [rec_score]
+            text, rec_score, rec_char_scores = getstr_grid(char_masks[index,:,:,:].copy(), box_w, box_h)
+                # print(rec_score)
+            ## save char_scores
+            result_log = [int(x * 1.0) for x in box[:4]] + pts_origin + [text] + [scores[index]] + [rec_score] + [rec_char_scores]
             result_logs.append(result_log)
             if vis:    
                 img_draw.rectangle(box, outline=(255, 0, 0))
-                img_draw.polygon(pts, outline=(255, 225, 0))
+                if cfg.TEST.DATASETS[0]=='totaltext_test' or cfg.TEST.DATASETS[0]=='cute80':
+                    hull = np.array(hull, dtype="int")
+                    pts = get_polygon(hull, box[0], box[1], im.shape[0], im.shape[1], 1)
+                    # print('pts:', pts)
+                    img_draw.polygon(pts, outline=(255, 225, 0))
+                else:
+                    img_draw.polygon(pts, outline=(255, 225, 0))
                 # img_draw.polygon(pts, outline=(255, 225, 0), fill=(225,225,0,20))
                 fnt = ImageFont.truetype('./fonts/kaiti.ttf', 20)
-                img_draw.text((box[0], box[1]), text + ';' + str(scores[index])+ ';' + str(rec_score)[:4], font=fnt, fill = (0,0,225,255))
+                # img_draw.text((box[0], box[1]), text + ';' + str(scores[index])+ ';' + str(rec_score)[:4], font=fnt, fill = (0,0,225,255))
+                img_draw.text((box[0], box[1]), text, font=fnt, fill = (0,0,225,255))
                 poly = np.array(Image.fromarray(cls_polys).resize((box_w, box_h))) 
                 cls_chars = 255 - (char_masks[index, 0, :, :]*255).astype(np.uint8)      
                 char = np.array(Image.fromarray(cls_chars).resize((box_w, box_h)))
@@ -143,19 +153,20 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
                 #     keep_charboxes[:, 2] = keep_charboxes[:, 2]*box_w/32 + box[0]
                 #     keep_charboxes[:, 3] = keep_charboxes[:, 3]*box_h/32 + box[1]
                 # else:
-                keep_charboxes[:, 0] = keep_charboxes[:, 0]*box_w/128 + box[0]
-                keep_charboxes[:, 1] = keep_charboxes[:, 1]*box_h/32 + box[1]
-                keep_charboxes[:, 2] = keep_charboxes[:, 2]*box_w/128 + box[0]
-                keep_charboxes[:, 3] = keep_charboxes[:, 3]*box_h/32 + box[1]
+                # if not cfg.TEST.GRID: 
+                #     keep_charboxes[:, 0] = keep_charboxes[:, 0]*box_w/128 + box[0]
+                #     keep_charboxes[:, 1] = keep_charboxes[:, 1]*box_h/32 + box[1]
+                #     keep_charboxes[:, 2] = keep_charboxes[:, 2]*box_w/128 + box[0]
+                #     keep_charboxes[:, 3] = keep_charboxes[:, 3]*box_h/32 + box[1]
 
-                for bb in keep_charboxes:
-                    img_draw.rectangle(bb, outline=(0, 255, 0))
+                #     for bb in keep_charboxes:
+                #         img_draw.rectangle(bb, outline=(0, 255, 0))
         
         if vis:
             save_dir_visu = os.path.join(model_dir, model_name+'_visu')
             if not os.path.isdir(save_dir_visu):
                 os.mkdir(save_dir_visu)
-            img_poly = Image.fromarray(img_poly).convert('RGB')
+            # img_poly = Image.fromarray(img_poly).convert('RGB')
             img_char = Image.fromarray(img_char).convert('RGB')
             # Image.blend(img, img_poly, 0.5).save(os.path.join(save_dir_visu, str(image_name) + '_blend_poly.jpg'))
             Image.blend(img, img_char, 0.5).save(os.path.join(save_dir_visu, str(image_name) + '_blend_char.jpg'))
@@ -165,8 +176,13 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
 
 def format_output(out_dir, boxes, img_name):
     res = open(os.path.join(out_dir, 'res_' + img_name.split('.')[0] + '.txt'), 'w')
-    for box in boxes:
-        box = ','.join([str(x) for x in box])
+    ## char score save dir
+    ssur_name = os.path.join(out_dir, 'res_' + img_name.split('.')[0])
+    for i, box in enumerate(boxes):
+        save_name = ssur_name + '_' + str(i) + '.mat'
+        np.save(save_name, box[-1])
+        box = ','.join([str(x) for x in box[:-1]]) + ',' + save_name
+        # print(box)
         res.write(box + '\n')
     res.close()
 
@@ -466,17 +482,15 @@ def im_detect_mask(model, im_scales, boxes):
     pred_char_masks = workspace.FetchBlob(
         core.ScopedName('mask_fcn_char_probs')
     ).squeeze()
-    pred_char_boxes = workspace.FetchBlob(
-        core.ScopedName('mask_fcn_charbox_pred')
-    ).squeeze()
+    # pred_char_boxes = workspace.FetchBlob(
+    #     core.ScopedName('mask_fcn_charbox_pred')
+    # ).squeeze()
     pred_global_masks = pred_global_masks.reshape([-1, 1, M_HEIGHT, M_WIDTH])
     pred_char_masks = pred_char_masks.reshape([-1, M_HEIGHT, M_WIDTH, 37])
     pred_char_masks = pred_char_masks.transpose([0,3,1,2])
-    pred_char_boxes = pred_char_boxes.reshape([-1, 4,  M_HEIGHT, M_WIDTH])
+    # pred_char_boxes = pred_char_boxes.reshape([-1, 4,  M_HEIGHT, M_WIDTH])
 
-
-
-    return pred_global_masks, pred_char_masks, pred_char_boxes
+    return pred_global_masks, pred_char_masks, None
 
 
 def im_detect_mask_aug(model, im, boxes):
@@ -976,17 +990,15 @@ def segm_results(cls_boxes, masks, ref_boxes, im_h, im_w):
 
 
 
-def getstr(seg, charboxes, box_w, box_h, image_name, thresh_s=0.15, is_lanms=True, weight_wh=False):
+def getstr(seg, charboxes, box_w, box_h, thresh_s=0.15, is_lanms=True, weight_wh=False):
     bg_map = (1 - seg[0, :, :])
     # bg_map = cv2.GaussianBlur(bg_map, (3, 3), sigmaX=3)
     ret, thresh = cv2.threshold(bg_map, 0.15, 1, cv2.THRESH_BINARY)
     # cv2.imwrite('./bin.jpg', (thresh*255).astype(np.uint8))
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3, 3))  
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3, 3)) 
     eroded = cv2.erode(thresh,kernel)
-    # if image_name=='img_10.jpg':
-    #     print('----------')
-    #     cv2.imwrite('./eroded.jpg', (eroded*255).astype(np.uint8))
-    #     raw_input()
+    # cv2.imwrite('./eroded.jpg', (eroded*255).astype(np.uint8))
+    # raw_input()
     eroded = eroded.reshape((-1, 1))
 
     mask_index = np.argmax(seg, axis=0)
@@ -1046,20 +1058,59 @@ def getstr(seg, charboxes, box_w, box_h, image_name, thresh_s=0.15, is_lanms=Tru
             char['y'] = (all_charboxes[i][1] + all_charboxes[i][3])/2.0
             char['s'] = all_charboxes[i][4]
             char['c'] = num2char(all_labels[i])
-            chars.append(char)
+            char['w'] = (all_charboxes[i][2] - all_charboxes[i][0])
+            char['h'] = (all_charboxes[i][3] - all_charboxes[i][1])
+            if char['w'] > 3 and char['h'] > 3:
+                ## shrink char box
+                sx1, sy1, sx2, sy2 = shrink_rect_with_ratio([char['x'], char['y'], char['w'], char['h']], 0.25)
+                ## get mean
+                cs = seg[1:, sy1:sy2, sx1:sx2].reshape((36, -1)).mean(axis=1).reshape((-1, 1))
+                char['cs'] = cs
+                chars.append(char)
         chars = sorted(chars, key = lambda x: x['x'])
         string = ''
         score = 0
         scores = []
+        css = []
         for char in chars:
             string = string + char['c']
             score += char['s']
             scores.append(char['s'])
+            css.append(char['cs'])
         if len(chars) > 0:
             score = score / len(chars)
-        return string, score, scores, all_charboxes
+        return string, score, scores, all_charboxes, np.hstack((css))
     else:
-        return '', 0, [], np.zeros((0, 5))
+        return '', 0, [], np.zeros((0, 5)), None
+
+def getstr_grid(seg, box_w, box_h):
+    pos = 255 - (seg[0]*255).astype(np.uint8)
+    mask_index = np.argmax(seg, axis=0)
+    mask_index = mask_index.astype(np.uint8)
+    pos = pos.astype(np.uint8)
+    # seg = seg*255
+    # seg = seg.astype(np.uint8)
+    ## resize pos and mask_index
+
+    # pos = np.array(Image.fromarray(pos).resize((box_w, box_h)))
+    # seg_resize = np.zeros((seg.shape[0], box_h, box_w))
+    # for i in range(seg.shape[0]):
+    #     seg_resize[i,:,:] = np.array(Image.fromarray(seg[i,:,:]).resize((box_w, box_h)))
+    # mask_index = np.array(Image.fromarray(mask_index).resize((box_w, box_h), Image.NEAREST))
+    # string, score = seg2text(pos, mask_index, seg_resize)
+    string, score, rec_scores = seg2text(pos, mask_index, seg)
+    return string, score, rec_scores
+
+def shrink_rect_with_ratio(rect, ratio):
+    ## rect:[xc, yc, w, h]
+    xc, yc, w, h = rect[0], rect[1], rect[2], rect[3]
+    x1, y1, x2, y2 = int(xc - w*ratio), int(yc - h*ratio), int(xc + w*ratio), int(yc + h*ratio)
+    ## keep the area of the shrinked box no less than 1 
+    if x2 == x1:
+        x2 = x1 + 1
+    if y2 == y1:
+        y2 = y1 + 1
+    return x1, y1, x2, y2
 
 def shrink_single_box(poly):
     xc = (poly[0] + poly[2])/2.0
@@ -1165,35 +1216,42 @@ def seg2text(gray, mask, seg):
         cv2.drawContours(temp, [contours[i]], 0, (255), -1)
         x, y, w, h = cv2.boundingRect(contours[i])
         c_x, c_y = x + w/2, y + h/2
-        tmax = 0
-        sym = -1
-        score = 0
-        pixs = mask[temp == 255]
-        seg_contour = seg[:, temp == 255]
-        seg_contour = seg_contour.astype(np.float32) / 255
-        for j in range(1, 37):
-            tnum = (pixs == j).sum()
-            if tnum > tmax:
-                tmax = tnum
-                sym = j
-        if sym == -1:
-            continue
-        contour_score = seg_contour[sym,:].sum() / pixs.size
-        scores.append(contour_score)
-        sym = num2char(sym)
+        # tmax = 0
+        # sym = -1
+        # score = 0
+        # pixs = mask[temp == 255]
+        # seg_contour = seg[:, temp == 255]
+        # seg_contour = seg_contour.astype(np.float32) / 255
+        # for j in range(1, 37):
+        #     tnum = (pixs == j).sum()
+        #     if tnum > tmax:
+        #         tmax = tnum
+        #         sym = j
+        # if sym == -1:
+        #     continue
+        # contour_score = seg_contour[sym,:].sum() / pixs.size
+
+        regions = seg[1:, temp ==255].reshape((36, -1))
+        cs = np.mean(regions, axis=1)
+        sym = num2char(np.argmax(cs.reshape((-1))) + 1)
         char['x'] = c_x
         char['y'] = c_y
         char['s'] = sym
+        char['cs'] = cs.reshape((-1, 1))
+        scores.append(np.max(char['cs'], axis=0)[0])
+
         chars.append(char)
     chars = sorted(chars, key = lambda x: x['x'])
     string = ''
+    css = []
     for char in chars:
         string = string + char['s']
+        css.append(char['cs'])
     if len(scores)>0:
         score = sum(scores) / len(scores)
     else:
         score = 0.00
-    return string, score
+    return string, score, np.hstack(css)
 
 def get_tight_rect(points, start_x, start_y, image_height, image_width, scale):
     points = list(points)
@@ -1255,6 +1313,18 @@ def get_tight_rect(points, start_x, start_y, image_height, image_width, scale):
         py4 = image_height - 1
     return [px1, py1, px2, py2, px3, py3, px4, py4]
 
+def get_polygon(points, start_x, start_y, image_height, image_width, scale):
+    points = list(points)
+    # ps = sorted(points,key = lambda x:x[0])
+    polygon = []
+    for i in range(len(points)):
+        point = points[i]
+        x = point[0][0] * scale + start_x
+        y = point[0][1] * scale + start_y
+        polygon.append(x)
+        polygon.append(y)
+    return polygon
+
 def segm_char_results(cls_boxes, masks, ref_boxes, im_h, im_w):
     num_classes = 37
     char_strs = [[] for _ in range(cls_boxes[1].shape[0])]
@@ -1266,7 +1336,7 @@ def segm_char_results(cls_boxes, masks, ref_boxes, im_h, im_w):
         text, rec_score = getstr(masks[k,:,:,:], M_HEIGHT, M_WIDTH)
         char_strs.append(text)
         char_strs_scores.append(rec_score)
-        print(text, rec_score)
+        # print(text, rec_score)
 
     return char_strs, char_strs_scores
 
