@@ -4,8 +4,8 @@ MODEL:
   NUM_CLASSES: 2
   FASTER_RCNN: True
   MASK_ON: True
-  NAME: east++
-NUM_GPUS: 1
+  NAME: shrink++
+NUM_GPUS: 4
 SOLVER:
   WEIGHT_DECAY: 0.0001
   LR_POLICY: steps_with_decay
