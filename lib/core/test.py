@@ -204,10 +204,11 @@ def format_output(out_dir, boxes, img_name):
     ssur_name = os.path.join(out_dir, 'res_' + img_name.split('.')[0])
     for i, box in enumerate(boxes):
         save_name = ssur_name + '_' + str(i) + '.mat'
-        np.save(save_name, box[-2])
         if cfg.TEST.DATASETS[0]=='totaltext_test' or cfg.TEST.DATASETS[0]=='cute80':
+            np.save(save_name, box[-2])
             box = ','.join([str(x) for x in box[:4]]) + ';' + ','.join([str(x) for x in box[4:4+int(box[-1])]]) + ';' + ','.join([str(x) for x in box[4+int(box[-1]):-2]]) + ',' + save_name
         else:
+            np.save(save_name, box[-1])
             box = ','.join([str(x) for x in box[:-1]]) + ',' + save_name
         # print(box)
         res.write(box + '\n')

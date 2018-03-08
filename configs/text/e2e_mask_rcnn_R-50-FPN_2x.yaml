@@ -137,7 +137,7 @@ TEST:
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune_mix_aug/model_final.pkl
   # DATASETS: ('totaltext_test',)
   DATASETS: ('icdar2015_test',)
-  SCALES: (1600,)
+  SCALES: (800,)
   MAX_SIZE: 3333
   NMS: 0.5
   RPN_PRE_NMS_TOP_N: 1000  # Per FPN level
