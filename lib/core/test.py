@@ -92,7 +92,7 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
             img_poly = np.zeros((im.shape[0], im.shape[1]))
             im = cv2.cvtColor(im,cv2.COLOR_BGR2RGB)
             img = Image.fromarray(im).convert('RGB')
-            img_draw = ImageDraw.Draw(img)
+            img_draw = ImageDraw.Draw(img, 'RGBA')
         for index in range(global_masks.shape[0]):
             box = boxes[index]
             box = map(int, box)
@@ -102,45 +102,69 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
             poly_map = np.array(Image.fromarray(cls_polys).resize((box_w, box_h)))
             poly_map = poly_map.astype(np.float32) / 255
             poly_map=cv2.GaussianBlur(poly_map,(3,3),sigmaX=3)
-            a, poly_map=cv2.threshold(poly_map, 0.5 ,1, cv2.THRESH_BINARY)
-            SE1=cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
-            poly_map = cv2.erode(poly_map,SE1) 
-            poly_map = cv2.dilate(poly_map,SE1);
-            poly_map = cv2.morphologyEx(poly_map,cv2.MORPH_CLOSE,SE1)
-            idy,idx=np.where(poly_map == 1)
-            xy=np.vstack((idx,idy))
-            xy=np.transpose(xy)
-            hull = cv2.convexHull(xy, clockwise=True)
-            #reverse order of points.
-            if  hull is None:
-                continue
-            hull=hull[::-1]
-            # print(hull)
-            #find minimum area bounding box.
-            rect = cv2.minAreaRect(hull)
-            corners = cv2.boxPoints(rect)
-            corners = np.array(corners, dtype="int")
-            pts = get_tight_rect(corners, box[0], box[1], im.shape[0], im.shape[1], 1)
-            pts_origin = [x * 1.0 for x in pts]
-            pts_origin = map(int, pts_origin)
+            ret, poly_map = cv2.threshold(poly_map,0.5,1,cv2.THRESH_BINARY)
+            if cfg.TEST.DATASETS[0]=='totaltext_test' or cfg.TEST.DATASETS[0]=='cute80':
+                SE1=cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
+                poly_map = cv2.erode(poly_map,SE1) 
+                poly_map = cv2.dilate(poly_map,SE1);
+                poly_map = cv2.morphologyEx(poly_map,cv2.MORPH_CLOSE,SE1)
+                im2,contours,hierarchy = cv2.findContours((poly_map*255).astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+                max_area=0
+                max_cnt = contours[0]
+                for cnt in contours:
+                    area=cv2.contourArea(cnt)
+                    if area > max_area:
+                        max_area = area
+                        max_cnt = cnt
+                perimeter = cv2.arcLength(max_cnt,True)
+                epsilon = 0.01*cv2.arcLength(max_cnt,True)
+                approx = cv2.approxPolyDP(max_cnt,epsilon,True)
+                pts = approx.reshape((-1,2))
+                pts[:,0] = pts[:,0] + box[0]
+                pts[:,1] = pts[:,1] + box[1]
+                segms = list(pts.reshape((-1,)))
+                segms = map(int, segms)
+                if len(segms)<6:
+                    continue     
+            else:      
+                SE1=cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
+                poly_map = cv2.erode(poly_map,SE1) 
+                poly_map = cv2.dilate(poly_map,SE1);
+                poly_map = cv2.morphologyEx(poly_map,cv2.MORPH_CLOSE,SE1)
+                idy,idx=np.where(poly_map == 1)
+                xy=np.vstack((idx,idy))
+                xy=np.transpose(xy)
+                hull = cv2.convexHull(xy, clockwise=True)
+                #reverse order of points.
+                if  hull is None:
+                    continue
+                hull=hull[::-1]
+                # print(hull)
+                #find minimum area bounding box.
+                rect = cv2.minAreaRect(hull)
+                corners = cv2.boxPoints(rect)
+                corners = np.array(corners, dtype="int")
+                pts = get_tight_rect(corners, box[0], box[1], im.shape[0], im.shape[1], 1)
+                pts_origin = [x * 1.0 for x in pts]
+                pts_origin = map(int, pts_origin)
             text, rec_score, rec_char_scores = getstr_grid(char_masks[index,:,:,:].copy(), box_w, box_h)
                 # print(rec_score)
             ## save char_scores
-            result_log = [int(x * 1.0) for x in box[:4]] + pts_origin + [text] + [scores[index]] + [rec_score] + [rec_char_scores]
+            if cfg.TEST.DATASETS[0]=='totaltext_test' or cfg.TEST.DATASETS[0]=='cute80':
+                result_log = [int(x * 1.0) for x in box[:4]] + segms + [text] + [scores[index]] + [rec_score] + [rec_char_scores] +[len(segms)]
+            else:
+                result_log = [int(x * 1.0) for x in box[:4]] + pts_origin + [text] + [scores[index]] + [rec_score] + [rec_char_scores]
             result_logs.append(result_log)
             if vis:    
                 img_draw.rectangle(box, outline=(255, 0, 0))
                 if cfg.TEST.DATASETS[0]=='totaltext_test' or cfg.TEST.DATASETS[0]=='cute80':
-                    hull = np.array(hull, dtype="int")
-                    pts = get_polygon(hull, box[0], box[1], im.shape[0], im.shape[1], 1)
-                    # print('pts:', pts)
-                    img_draw.polygon(pts, outline=(255, 225, 0))
+                    img_draw.polygon(segms, outline=(255, 0, 0), fill=(0, 225, 0, 50))
                 else:
-                    img_draw.polygon(pts, outline=(255, 225, 0))
+                    img_draw.polygon(pts, outline=(0, 225, 0), fill=(0, 225, 0, 50))
                 # img_draw.polygon(pts, outline=(255, 225, 0), fill=(225,225,0,20))
                 fnt = ImageFont.truetype('./fonts/kaiti.ttf', 20)
                 # img_draw.text((box[0], box[1]), text + ';' + str(scores[index])+ ';' + str(rec_score)[:4], font=fnt, fill = (0,0,225,255))
-                img_draw.text((box[0], box[1]), text, font=fnt, fill = (0,0,225,255))
+                # img_draw.text((box[0], box[1]), text, font=fnt, fill = (0,0,225,255))
                 poly = np.array(Image.fromarray(cls_polys).resize((box_w, box_h))) 
                 cls_chars = 255 - (char_masks[index, 0, :, :]*255).astype(np.uint8)      
                 char = np.array(Image.fromarray(cls_chars).resize((box_w, box_h)))
@@ -180,8 +204,11 @@ def format_output(out_dir, boxes, img_name):
     ssur_name = os.path.join(out_dir, 'res_' + img_name.split('.')[0])
     for i, box in enumerate(boxes):
         save_name = ssur_name + '_' + str(i) + '.mat'
-        np.save(save_name, box[-1])
-        box = ','.join([str(x) for x in box[:-1]]) + ',' + save_name
+        np.save(save_name, box[-2])
+        if cfg.TEST.DATASETS[0]=='totaltext_test' or cfg.TEST.DATASETS[0]=='cute80':
+            box = ','.join([str(x) for x in box[:4]]) + ';' + ','.join([str(x) for x in box[4:4+int(box[-1])]]) + ';' + ','.join([str(x) for x in box[4+int(box[-1]):-2]]) + ',' + save_name
+        else:
+            box = ','.join([str(x) for x in box[:-1]]) + ',' + save_name
         # print(box)
         res.write(box + '\n')
     res.close()
@@ -561,11 +588,11 @@ def im_detect_mask_aug(model, im, boxes):
     if cfg.TEST.MASK_AUG.HEUR == 'SOFT_AVG':
         global_masks_c = np.mean(global_masks_ts, axis=0)
         char_masks_c = np.mean(char_masks_ts, axis=0)
-        char_boxes_c = np.mean(char_boxes_ts, axis=0)
+        # char_boxes_c = np.mean(char_boxes_ts, axis=0)
     elif cfg.TEST.MASK_AUG.HEUR == 'SOFT_MAX':
         global_masks_c = np.amax(global_masks_ts, axis=0)
         char_masks_c = np.amax(char_masks_ts, axis=0)
-        char_boxes_c = np.amax(char_boxes_ts, axis=0)
+        # char_boxes_c = np.amax(char_boxes_ts, axis=0)
     elif cfg.TEST.MASK_AUG.HEUR == 'LOGIT_AVG':
 
         def logit(y):
@@ -579,15 +606,15 @@ def im_detect_mask_aug(model, im, boxes):
         char_logit_masks = np.mean(char_logit_masks, axis=0)
         char_masks_c = 1.0 / (1.0 + np.exp(-char_logit_masks))
 
-        char_logit_boxes = [logit(y) for y in char_boxes_ts]
-        char_logit_boxes = np.mean(char_logit_boxes, axis=0)
-        char_boxes_c = 1.0 / (1.0 + np.exp(-char_logit_boxes))
+        # char_logit_boxes = [logit(y) for y in char_boxes_ts]
+        # char_logit_boxes = np.mean(char_logit_boxes, axis=0)
+        # char_boxes_c = 1.0 / (1.0 + np.exp(-char_logit_boxes))
     else:
         raise NotImplementedError(
             'Heuristic {} not supported'.format(cfg.TEST.MASK_AUG.HEUR)
         )
 
-    return global_masks_c, char_masks_c, char_boxes_c
+    return global_masks_c, char_masks_c, None
 
 
 def im_detect_mask_hflip(model, im, boxes):
@@ -603,10 +630,10 @@ def im_detect_mask_hflip(model, im, boxes):
 
     # Invert the predicted soft masks
     global_masks_inv = global_masks_hf[:, :, :, ::-1]
-    char_masks_inv = char_masks_hf[:, :, :, ::-1]
-    char_boxes_inv = char_boxes_hf[:, :, :, ::-1]
+    # char_masks_inv = char_masks_hf[:, :, :, ::-1]
+    # char_boxes_inv = char_boxes_hf[:, :, :, ::-1]
 
-    return global_masks_inv, char_masks_inv, char_boxes_inv
+    return global_masks_inv, char_masks_inv, None
 
 
 def im_detect_mask_scale(model, im, scale, max_size, boxes, hflip=False):
@@ -630,7 +657,7 @@ def im_detect_mask_scale(model, im, scale, max_size, boxes, hflip=False):
     cfg.TEST.SCALES = orig_scales
     cfg.TEST.MAX_SIZE = orig_max_size
 
-    return global_masks_scl, char_masks_scl, char_boxes_scl
+    return global_masks_scl, char_masks_scl, None
 
 
 def im_detect_mask_aspect_ratio(model, im, aspect_ratio, boxes, hflip=False):
@@ -638,15 +665,15 @@ def im_detect_mask_aspect_ratio(model, im, aspect_ratio, boxes, hflip=False):
 
     # Perform mask detection on the transformed image
     im_ar = image_utils.aspect_ratio_rel(im, aspect_ratio)
-    boxes_ar = box_utils.aspect_ratio(boxes, aspect_ratio)
+    # boxes_ar = box_utils.aspect_ratio(boxes, aspect_ratio)
 
     if hflip:
-        global_masks_ar, char_masks_ar, char_boxes_ar = im_detect_mask_hflip(model, im_ar, boxes_ar)
+        global_masks_ar, char_masks_ar, char_boxes_ar = im_detect_mask_hflip(model, im_ar, None)
     else:
         im_scales = im_conv_body_only(model, im_ar)
-        global_masks_ar, char_masks_ar, char_boxes_ar = im_detect_mask(model, im_scales, boxes_ar)
+        global_masks_ar, char_masks_ar, char_boxes_ar = im_detect_mask(model, im_scales, None)
 
-    return global_masks_ar, char_masks_ar, char_boxes_ar
+    return global_masks_ar, char_masks_ar, None
 
 
 def im_detect_keypoints(model, im_scales, boxes):
@@ -1251,6 +1278,8 @@ def seg2text(gray, mask, seg):
         score = sum(scores) / len(scores)
     else:
         score = 0.00
+    if not css:
+        css=[0.]
     return string, score, np.hstack(css)
 
 def get_tight_rect(points, start_x, start_y, image_height, image_width, scale):

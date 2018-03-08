@@ -132,12 +132,13 @@ IMAGE:
 TEST:
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune/model_final.pkl
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/east_weight_wh_finetune_aug_ms_charann/model_iter69999.pkl
-  WEIGHTS: ./train/shrink++/model_iter169999.pkl
+  WEIGHTS: ./train/shrink++_poly_finetune/model_iter69999.pkl
+  # WEIGHTS: ./train/shrink++_poly/model_iter169999.pkl
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune_mix_aug/model_final.pkl
-  # DATASETS: ('total_test',)
-  DATASETS: ('icdar2013_test',)
-  SCALES: (800,)
-  MAX_SIZE: 1333
+  # DATASETS: ('totaltext_test',)
+  DATASETS: ('icdar2015_test',)
+  SCALES: (1600,)
+  MAX_SIZE: 3333
   NMS: 0.5
   RPN_PRE_NMS_TOP_N: 1000  # Per FPN level
   RPN_POST_NMS_TOP_N: 1000
@@ -160,8 +161,8 @@ TEST:
     ENABLED: False
     HEUR: SOFT_AVG
     H_FLIP: False
-    SCALES: (600, 800, 1000, 1200)
-    MAX_SIZE: 2000
+    SCALES: (1600,)
+    MAX_SIZE: 3333
     SCALE_H_FLIP: False
     SCALE_SIZE_DEP: False
     AREA_TH: 32400  # 180^2
