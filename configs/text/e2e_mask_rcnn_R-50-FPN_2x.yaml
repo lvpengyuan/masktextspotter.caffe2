@@ -132,17 +132,18 @@ IMAGE:
 TEST:
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune/model_final.pkl
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/east_weight_wh_finetune_aug_ms_charann/model_iter69999.pkl
-  WEIGHTS: ./train/shrink++_poly_finetune/model_iter69999.pkl
+  WEIGHTS: ./train/shrink++_finetune/model_iter79999.pkl
   # WEIGHTS: ./train/shrink++_poly/model_iter169999.pkl
   # WEIGHTS: ./train/synth_train:icdar2013_train:icdar2015_train/generalized_rcnn/mix_finetune_mix_aug/model_final.pkl
   # DATASETS: ('totaltext_test',)
-  DATASETS: ('icdar2015_test',)
-  SCALES: (800,)
+  DATASETS: ('icdar2013_test',)
+  SCALES: (1000,)
   MAX_SIZE: 3333
   NMS: 0.5
   RPN_PRE_NMS_TOP_N: 1000  # Per FPN level
   RPN_POST_NMS_TOP_N: 1000
-  VIS: True
+  VIS: False
+  SCORE_THRESH: 0.2
   BBOX_AUG:
     ENABLED: False
     SCORE_HEUR: UNION  # AVG NOTE: cannot use AVG for e2e model
