@@ -295,13 +295,10 @@ def _rotate_image(im, boxes, polygons, charboxes):
 
         M = cv2.getRotationMatrix2D((r_width/2, r_height/2), delta, 1)
         im = cv2.warpAffine(im_padding, M, (r_width, r_height))
-
-        ## get new boxes
-        ## gt
-        new_boxes[:, :4] = _quad2minrect(_rotate_polygons(_rect2quad(boxes), -1*delta, (r_width/2, r_height/2)))
+        
         ## polygons
-        # new_polygons = _rotate_polygons(polygons, -1*delta, (r_width/2, r_height/2))
         new_polygons = _rotate_segms(polygons, -1*delta, (r_width/2, r_height/2), start_h, start_w)
+        new_boxes[:, :4] = _quadlist2minrect(new_polygons)
         ## charboxes
         if charboxes[:, -1].mean() != -1:
             new_charboxes[:, :8] = _rotate_polygons(charboxes[:, :8], -1*delta, (r_width/2, r_height/2))
