@@ -74,7 +74,7 @@ Note: Caffe2 is difficult to install sometimes.
 
 Our trained model:
 [Google Drive](https://drive.google.com/open?id=1yPATzUCREBopDIHcsvdYOBB3YpStunMU);
-[BaiduYun](链接：https://pan.baidu.com/s/1JPZmOQ1LAw98s0GPa-PuuQ) (key of BaiduYun: gnpc)
+[BaiduYun](https://pan.baidu.com/s/1JPZmOQ1LAw98s0GPa-PuuQ) (key of BaiduYun: gnpc)
 
 ### Test
 
