@@ -1,5 +1,5 @@
 #-*-coding:utf-8-*- 
-# Seg2Text
+# Created by Pengyuan Lyu
 #####################################################################
 
 """ We create a new class for text datasets for convenience. 
@@ -143,14 +143,6 @@ class TextDataSet(object):
         xmaxs = np.maximum.reduce([charbbs[:,0], charbbs[:,2], charbbs[:,4], charbbs[:,6]])
         ymins = np.minimum.reduce([charbbs[:,1], charbbs[:,3], charbbs[:,5], charbbs[:,7]])
         ymaxs = np.maximum.reduce([charbbs[:,1], charbbs[:,3], charbbs[:,5], charbbs[:,7]])
-        # xmins = min(charbbs[:,0], charbbs[:,2], charbbs[:,4], charbbs[:,6])
-        # xmaxs = max(charbbs[:,0], charbbs[:,2], charbbs[:,4], charbbs[:,6])
-        # ymins = min(charbbs[:,1], charbbs[:,3], charbbs[:,5], charbbs[:,7])
-        # ymaxs = max(charbbs[:,1], charbbs[:,3], charbbs[:,5], charbbs[:,7])
-        # if min(xmaxs - xmins) < self.min_proposal_size:
-        #     return False
-        # if min(ymaxs - ymins) < self.min_proposal_size:
-        #     return False
         return np.logical_and(xmaxs - xmins > self.min_proposal_size, ymaxs - ymins > self.min_proposal_size)
 
     def load_gt_from_txt(self, gt_path, height, width):

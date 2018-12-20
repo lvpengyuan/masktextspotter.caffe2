@@ -1,3 +1,5 @@
+# Modified by Minghui Liao and Pengyuan Lyu
+###############################################################################
 # Copyright (c) 2017-present, Facebook, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -439,6 +441,8 @@ __C.TEST.BBOX_VOTE.SCORING_METHOD = b'ID'
 __C.TEST.BBOX_VOTE.SCORING_METHOD_BETA = 1.0
 
 __C.TEST.VIS = False
+
+__C.TEST.OUTPUT_POLYGON = False
 
 
 # ---------------------------------------------------------------------------- #

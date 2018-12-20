@@ -1,3 +1,5 @@
+# Modified by Pengyuan Lyu
+# ##############################################################################
 # Copyright (c) 2017-present, Facebook, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -101,17 +103,6 @@ def mix_roidbs_for_training(dataset_names, proposal_files, use_charanns):
     assert len(dataset_names) == len(proposal_files)
     assert len(dataset_names) == len(use_charanns)
     roidbs = [get_roidb(*args) for args in zip(dataset_names, proposal_files, use_charanns)]
-    # roidb = roidbs[0]
-    # for r in roidbs[1:]:
-    #     roidb.extend(r)
-    # roidb = filter_for_training(roidb)
-
-    # logger.info('Computing bounding-box regression targets...')
-    # add_bbox_regression_targets(roidb)
-    # logger.info('done')
-
-    # _compute_and_log_stats(roidb)
-
     roidbs = [filter_for_training(roidb) for roidb in roidbs]
     for roidb in roidbs:
         add_bbox_regression_targets(roidb)

@@ -1,3 +1,5 @@
+# Modified by Minghui Liao and Pengyuan Lyu
+###############################################################################
 # Copyright (c) 2017-present, Facebook, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -91,8 +93,6 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
             img_char = np.zeros((im.shape[0], im.shape[1]))
             img_poly = np.zeros((im.shape[0], im.shape[1]))
             im = cv2.cvtColor(im,cv2.COLOR_BGR2RGB)
-            # img = Image.fromarray(im).convert('RGB')
-            # img_draw = ImageDraw.Draw(img, 'RGBA')
         for index in range(global_masks.shape[0]):
             box = boxes[index]
             box = map(int, box)
@@ -103,8 +103,7 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
             poly_map = poly_map.astype(np.float32) / 255
             poly_map=cv2.GaussianBlur(poly_map,(3,3),sigmaX=3)
             ret, poly_map = cv2.threshold(poly_map,0.5,1,cv2.THRESH_BINARY)
-            # if cfg.TEST.DATASETS[0]=='totaltext_test' or cfg.TEST.DATASETS[0]=='cute80':
-            if cfg.TEST.DATASETS[0]=='totaltext_test' or cfg.TEST.DATASETS[0]=='cute80':
+            if cfg.TEST.OUTPUT_POLYGON:
                 SE1=cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
                 poly_map = cv2.erode(poly_map,SE1) 
                 poly_map = cv2.dilate(poly_map,SE1);
@@ -149,59 +148,30 @@ def im_detect_all(model, im, image_name, box_proposals, timers=None, vis=False):
                 pts_origin = [x * 1.0 for x in pts]
                 pts_origin = map(int, pts_origin)
             text, rec_score, rec_char_scores = getstr_grid(char_masks[index,:,:,:].copy(), box_w, box_h)
-                # print(rec_score)
-            ## save char_scores
-            # if cfg.TEST.DATASETS[0]=='totaltext_test' or cfg.TEST.DATASETS[0]=='cute80':
-            if cfg.TEST.DATASETS[0]=='totaltext_test' or cfg.TEST.DATASETS[0]=='cute80':
+            if cfg.TEST.OUTPUT_POLYGON:
                 result_log = [int(x * 1.0) for x in box[:4]] + segms + [text] + [scores[index]] + [rec_score] + [rec_char_scores] +[len(segms)]
             else:
                 result_log = [int(x * 1.0) for x in box[:4]] + pts_origin + [text] + [scores[index]] + [rec_score] + [rec_char_scores]
             result_logs.append(result_log)
             if vis:    
-                # img_draw.rectangle(box, outline=(255, 0, 0))
-                # if cfg.TEST.DATASETS[0]=='totaltext_test' or cfg.TEST.DATASETS[0]=='cute80':
-                if cfg.TEST.DATASETS[0]=='totaltext_test' or cfg.TEST.DATASETS[0]=='cute80':
+                if cfg.TEST.OUTPUT_POLYGON:
                     cv2.polylines(im, [np.array(segms).reshape((-1,2)).astype(np.int32)], True, color=(0, 255, 0), thickness=5)
                     # img_draw.polygon(segms, outline=(0, 255, 0))
                 else:
                     img_draw.polygon(pts, outline=(0, 255, 0))
-                # img_draw.polygon(pts, outline=(255, 225, 0), fill=(225,225,0,20))
-                # fnt = ImageFont.truetype('./fonts/kaiti.ttf', 20)
-                # img_draw.text((box[0], box[1]), text + ';' + str(scores[index])+ ';' + str(rec_score)[:4], font=fnt, fill = (0,0,225,255))
-                # img_draw.text((box[0], box[1]), text, font=fnt, fill = (0,0,225,255))
                 poly = np.array(Image.fromarray(cls_polys).resize((box_w, box_h))) 
                 cls_chars = 255 - (char_masks[index, 0, :, :]*255).astype(np.uint8)      
                 char = np.array(Image.fromarray(cls_chars).resize((box_w, box_h)))
                 img_poly[box[1]:box[3], box[0]:box[2]] = poly
                 img_char[box[1]:box[3], box[0]:box[2]] = char
-
-                # if cfg.MRCNN.WEIGHT_WH:
-                #     keep_charboxes[:, 0] = keep_charboxes[:, 0]*box_w/32 + box[0]
-                #     keep_charboxes[:, 1] = keep_charboxes[:, 1]*box_h/32 + box[1]
-                #     keep_charboxes[:, 2] = keep_charboxes[:, 2]*box_w/32 + box[0]
-                #     keep_charboxes[:, 3] = keep_charboxes[:, 3]*box_h/32 + box[1]
-                # else:
-                # if not cfg.TEST.GRID: 
-                #     keep_charboxes[:, 0] = keep_charboxes[:, 0]*box_w/128 + box[0]
-                #     keep_charboxes[:, 1] = keep_charboxes[:, 1]*box_h/32 + box[1]
-                #     keep_charboxes[:, 2] = keep_charboxes[:, 2]*box_w/128 + box[0]
-                #     keep_charboxes[:, 3] = keep_charboxes[:, 3]*box_h/32 + box[1]
-
-                #     for bb in keep_charboxes:
-                #         img_draw.rectangle(bb, outline=(0, 255, 0))
         
         if vis:
             save_dir_visu = os.path.join(model_dir, model_name+'_visu')
             if not os.path.isdir(save_dir_visu):
                 os.mkdir(save_dir_visu)
-            # img_poly = Image.fromarray(img_poly).convert('RGB')
             img_char = Image.fromarray(img_char).convert('RGB')
-            # img_origin = Image.fromarray(im).convert('RGB')
-            # img_blank = Image.fromarray(np.zeros((im.shape[0], im.shape[1]))).convert('RGB')
             img = Image.fromarray(im).convert('RGB')
             Image.blend(img, img_char, 0.5).save(os.path.join(save_dir_visu, str(image_name) + '_blend_char.jpg'))
-            # Image.blend(img_origin, img_blank, 0.5).save(os.path.join(save_dir_visu, str(image_name) + '_blend.jpg'))
-            # img.save(os.path.join(save_dir_visu, str(image_name) + '_blend_char.jpg'))
 
     format_output(save_dir_res, result_logs, image_name)
 
@@ -212,7 +182,7 @@ def format_output(out_dir, boxes, img_name):
     ssur_name = os.path.join(out_dir, 'res_' + img_name.split('.')[0])
     for i, box in enumerate(boxes):
         save_name = ssur_name + '_' + str(i) + '.mat'
-        if cfg.TEST.DATASETS[0]=='totaltext_test' or cfg.TEST.DATASETS[0]=='cute80':
+        if cfg.TEST.OUTPUT_POLYGON:
             np.save(save_name, box[-2])
             box = ','.join([str(x) for x in box[:4]]) + ';' + ','.join([str(x) for x in box[4:4+int(box[-1])]]) + ';' + ','.join([str(x) for x in box[4+int(box[-1]):-2]]) + ',' + save_name
         else:

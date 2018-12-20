@@ -88,6 +88,7 @@ IMAGE:
   rotate_prob: 0.5
   rotate_delta: 15
 TEST:
+  OUTPUT_POLYGON: False # only set to True for totaltext
   WEIGHTS: ./train/shrink++_finetune/model_iter79999.pkl
   DATASETS: ('icdar2013_test',)
   SCALES: (1000,)

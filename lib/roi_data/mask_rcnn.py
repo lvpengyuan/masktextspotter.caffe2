@@ -1,3 +1,5 @@
+# Modified by Minghui Liao and Pengyuan Lyu
+###############################################################################
 # Copyright (c) 2017-present, Facebook, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -135,8 +137,6 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
                 fg_inds, size=mask_rois_per_this_image, replace=False
             )
         roi_has_mask = np.ones((fg_inds.shape[0], ), dtype=np.int32)
-        # roi_has_mask = blobs['labels_int32'].copy()
-        # roi_has_mask[roi_has_mask > 0] = 1
 
         if fg_inds.shape[0] > 0:
             # Class labels for the foreground rois
@@ -146,7 +146,6 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
             char_boxes = np.zeros((fg_inds.shape[0], M_HEIGHT*M_WIDTH, 4), dtype=np.float32)
             char_boxes_inside_weight = np.zeros((fg_inds.shape[0], M_HEIGHT*M_WIDTH, 4), dtype=np.float32)
             char_boxes_outside_weight = np.zeros((fg_inds.shape[0], M_HEIGHT*M_WIDTH, 4), dtype=np.float32)
-            # mask_weights = blob_utils.zeros((fg_inds.shape[0], 2, M_HEIGHT*M_WIDTH), int32=True)
 
             # Find overlap between all foreground rois and the bounding boxes
             # enclosing each segmentation
@@ -173,20 +172,14 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
                     draw = ImageDraw.Draw(img)
                     draw.rectangle([(roi_fg[0],roi_fg[1]), (roi_fg[2],roi_fg[3])])
                     img.save('./tests/image.jpg')
-                    print(chars_gt)
                     _visu_global_map(mask[0,:,:].copy(), './tests/proposals_visu_global.jpg')
                     _visu_char_map(mask[1,:,:].copy(), './tests/proposals_visu_char.jpg')
                     _visu_char_box(char_box, char_box_inside_weight, './tests/char_box.jpg', M_HEIGHT, M_WIDTH)
-                    raw_input()
-                # mask = np.array(mask, dtype=np.int32)  # Ensure it's binary
-                # mask_weight = np.array(mask_weight, dtype=np.int32)  # Ensure it's binary
                 masks[i, 0, :] = np.reshape(mask[0,:,:], M_HEIGHT*M_WIDTH)
                 masks[i, 1, :] = np.reshape(mask[1,:,:], M_HEIGHT*M_WIDTH)
                 mask_weights[i, :] = np.reshape(mask_weight, M_HEIGHT*M_WIDTH)
                 char_boxes[i, :, :] = np.reshape(char_box, (M_HEIGHT*M_WIDTH, 4))
                 char_boxes_inside_weight[i, :, :] = np.reshape(char_box_inside_weight, (M_HEIGHT*M_WIDTH, 4))
-                # mask_weights[i, 0, :] = np.reshape(mask_weight[0,:,:], M_HEIGHT*M_WIDTH)
-                # mask_weights[i, 1, :] = np.reshape(mask_weight[1,:,:], M_HEIGHT*M_WIDTH)
         else:  # If there are no fg masks (it does happen)
             # The network cannot handle empty blobs, so we must provide a mask
             # We simply take the first bg roi, given it an all -1's mask (ignore
@@ -228,22 +221,13 @@ def add_charmask_rcnn_blobs(blobs, sampled_boxes, gt_boxes, gt_inds, roidb, im_s
                 # to an M_HEIGHT x M_WIDTH binary image
                 mask, char_box, char_box_inside_weight = segm_utils.polys_to_mask_wrt_box_rec(chars_gt, poly_gt, roi_fg, M_HEIGHT, M_WIDTH, weight_wh=cfg.MRCNN.WEIGHT_WH)
                 if DEBUG:
-                    # draw = ImageDraw.Draw(img)
-                    # draw.rectangle([(roi_fg[0],roi_fg[1]), (roi_fg[2],roi_fg[3])])
-                    # img.save('./tests/image.jpg')
-                    # print(chars_gt)
-                    # _visu_global_map(mask[0,:,:].copy(), './tests/proposals_visu_global.jpg')
-                    # _visu_char_map(mask[1,:,:].copy(), './tests/proposals_visu_char.jpg')
                     _visu_char_box(char_box, char_box_inside_weight, './tests/char_box.jpg', M_HEIGHT, M_WIDTH)
-                    raw_input()
                 mask = np.array(mask, dtype=np.int32)  # Ensure it's binary
                 # mask_weight = np.array(mask_weight, dtype=np.int32)  # Ensure it's binary
                 masks[i, 0, :] = np.reshape(mask[0,:,:], M_HEIGHT*M_WIDTH)
                 masks[i, 1, :] = np.reshape(mask[1,:,:], M_HEIGHT*M_WIDTH)
                 char_boxes[i, :, :] = np.reshape(char_box, (M_HEIGHT*M_WIDTH, 4))
                 char_boxes_inside_weight[i, :, :] = np.reshape(char_box_inside_weight, (M_HEIGHT*M_WIDTH, 4))
-                # mask_weights[i, 0, :] = np.reshape(mask_weight[0,:,:], M_HEIGHT*M_WIDTH)
-                # mask_weights[i, 1, :] = np.reshape(mask_weight[1,:,:], M_HEIGHT*M_WIDTH)
         else:  # If there are no fg masks (it does happen)
             # The network cannot handle empty blobs, so we must provide a mask
             # We simply take the first bg roi, given it an all -1's mask (ignore
