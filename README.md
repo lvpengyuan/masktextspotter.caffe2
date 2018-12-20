@@ -30,8 +30,9 @@ Please cite the paper in your publications if it helps your research:
 1. [Requirements](#requirements)
 2. [Installation](#installation)
 3. [Models](#models)
-4. [Test](#test)
-5. [Train](#train)
+4. [Datasets](#datasets)
+5. [Test](#test)
+6. [Train](#train)
 
 ### Requirements
 - NVIDIA GPU, Linux, Python2
@@ -71,12 +72,33 @@ Note: Caffe2 is difficult to install sometimes.
 
 
 ### Models
-
+Download the model and place it as ```models/model_iter79999.pkl```
 Our trained model:
 [Google Drive](https://drive.google.com/open?id=1yPATzUCREBopDIHcsvdYOBB3YpStunMU);
 [BaiduYun](https://pan.baidu.com/s/1JPZmOQ1LAw98s0GPa-PuuQ) (key of BaiduYun: gnpc)
 
+### Datasets
+Download the [ICDAR2013](https://drive.google.com/open?id=1sptDnAomQHFVZbjvnWt2uBvyeJ-gEl-A) and [ICDAR2015](https://drive.google.com/open?id=1HZ4Pbx6TM9cXO3gDyV04A4Gn9fTf2b5X) as examples.
+Datasets should be placed in ```lib/datasets/data/``` as below
+```
+synth
+icdar2013
+icdar2015
+scut-eng-char
+totaltext
+```
+If you do not train the model, you can just download the ICDAR2013 or ICDAR2015 datasets for testing.
+
 ### Test
+```
+python tools/test_net.py --cfg configs/text/mask_textspotter.yaml
+```
+You can modify the model path or the test dataset in ```configs/text/mask_textspotter.yaml```.
 
 ### Train
+You should format all the datasets you used for training as above.
+Then modify ```configs/text/mask_textspotter.yaml``` to fit the gpus, model path, and datasets.
+```
+python tools/train_net.py --cfg configs/text/mask_textspotter.yaml
+```
 
