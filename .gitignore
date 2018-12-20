@@ -16,3 +16,4 @@ tests/vis*
 train/
 fonts
 evaluation
+.*
