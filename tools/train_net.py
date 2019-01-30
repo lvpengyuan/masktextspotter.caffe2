@@ -332,7 +332,7 @@ def add_model_training_inputs(model):
     logger.info('Loading dataset: {}'.format(cfg.TRAIN.DATASETS))
     if not cfg.TRAIN.MIX_TRAIN:
         roidb = combined_roidb_for_training(
-            cfg.TRAIN.DATASETS, cfg.TRAIN.PROPOSAL_FILES
+            cfg.TRAIN.DATASETS, cfg.TRAIN.PROPOSAL_FILES, cfg.TRAIN.USE_CHARANNS
         )
         logger.info('{:d} roidb entries'.format(len(roidb)))
         model_builder.add_training_inputs(model, roidb=roidb)

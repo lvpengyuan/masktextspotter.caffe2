@@ -35,17 +35,18 @@ import utils.segms as segm_utils
 logger = logging.getLogger(__name__)
 
 
-def combined_roidb_for_training(dataset_names, proposal_files):
+def combined_roidb_for_training(dataset_names, proposal_files, use_charanns):
     """Load and concatenate roidbs for one or more datasets, along with optional
     object proposals. The roidb entries are then prepared for use in training,
     which involves caching certain types of metadata for each roidb entry.
     """
-    def get_roidb(dataset_name, proposal_file):
+    def get_roidb(dataset_name, proposal_file,use_charann):
         ds = TextDataSet(dataset_name)
         roidb = ds.get_roidb(
             gt=True,
             proposal_file=proposal_file,
-            crowd_filter_thresh=cfg.TRAIN.CROWD_FILTER_THRESH
+            crowd_filter_thresh=cfg.TRAIN.CROWD_FILTER_THRESH,
+            use_charann=use_charann
         )
         if cfg.TRAIN.USE_FLIPPED:
             logger.info('Appending horizontally-flipped training examples...')
@@ -60,7 +61,7 @@ def combined_roidb_for_training(dataset_names, proposal_files):
     if len(proposal_files) == 0:
         proposal_files = (None, ) * len(dataset_names)
     assert len(dataset_names) == len(proposal_files)
-    roidbs = [get_roidb(*args) for args in zip(dataset_names, proposal_files)]
+    roidbs = [get_roidb(*args) for args in zip(dataset_names, proposal_files, use_charanns)]
     roidb = roidbs[0]
     for r in roidbs[1:]:
         roidb.extend(r)
