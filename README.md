@@ -1,5 +1,7 @@
 # Mask TextSpotter
 
+### A Pytorch implementation of Mask TextSpotter along with its extension can be find [here](https://github.com/MhLiao/MaskTextSpotter)
+
 ### Introduction
 This is the official implementation of Mask TextSpotter.
 
